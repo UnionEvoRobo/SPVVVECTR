@@ -26,24 +26,24 @@
 /*                Variables declaration                   */
 
 /*
-String name = "Tensegrity-BT1";
+String name = "SPVVVECTR1";
 #define SERVICE_UUID        "afcdeba4-f8a9-4ca1-baa5-021afe634998"
 #define CHARACTERISTIC_UUID "83147421-2684-43ec-af39-58533d866c8e"
 
-String name = "Tensegrity-BT2";
+String name = "SPVVVECTR2";
 #define SERVICE_UUID        "8aaba9c2-7f68-49d6-97cb-b9783ea29fd6"
 #define CHARACTERISTIC_UUID "2a612f78-13b2-4b3a-bab8-50b00d2f003f"
 
-String name = "Tensegrity-BT3";
+String name = "SPVVVECTR3";
 #define SERVICE_UUID        "e132a2ee-a68a-4b4b-98fa-29ef8bbc0be2"
 #define CHARACTERISTIC_UUID "ccba8d13-8743-45f7-9fd9-69a20a9acddc"
 */
 
 
 /*      BLE variables: Change name and UUID here      */
-String name = "Tensegrity-BT1";
-#define SERVICE_UUID        "afcdeba4-f8a9-4ca1-baa5-021afe634998"
-#define CHARACTERISTIC_UUID "83147421-2684-43ec-af39-58533d866c8e"
+String name = "SPVVVECTR3";
+#define SERVICE_UUID        "e132a2ee-a68a-4b4b-98fa-29ef8bbc0be2"
+#define CHARACTERISTIC_UUID "ccba8d13-8743-45f7-9fd9-69a20a9acddc"
 
 BLECharacteristic *pGlobalCharacteristic; 
 bool sprint = true;
@@ -68,6 +68,7 @@ int16_t ax, ay, az;
 int16_t gx, gy, gz; 
 int     calibrate_size = 200;
 bool    blinkState;
+volatile bool is_calibrating = false;
 
 /*         Declare Encoder specifications here        */
 const float reduction_ratio = 10.0;         //Since the motor is 1:10 reduction
@@ -83,7 +84,7 @@ volatile int  direction = 1;                //1 is CCW
 volatile unsigned long stall_timer = 0;
 const unsigned long STALL_THRESHOLD_MS = 1000;  //time before killing power
 const float MIN_SAFE_RPM = 20.0;                //minimum RPM to be considered "moving"
-const int MAX_SPEED = 66535 * 20/100;           //pwm driver is 16-bit
+const int MAX_SPEED = 65535 * 20/100;           //pwm driver is 16-bit
 
 // Average calculation variables
 #define FILTER_SIZE 10
@@ -124,9 +125,15 @@ class MyCallbacks: public BLECharacteristicCallbacks {
       String value = pCharacteristic->getValue().c_str();
       value.trim();
       if (value.length() > 0) {
-        if (value.equalsIgnoreCase("calibrate")) {
-          //BLE IMU Calibration
-          mpu_calibration();
+        if (value.equalsIgnoreCase("calibrate") && !is_calibrating) {
+          //Run IMU Calibration task
+          xTaskCreate(
+            [](void* param) {
+              mpu_calibration();
+              vTaskDelete(NULL); // Self-terminate when finished
+            },
+            "mpu_cal_task", 4096, NULL, 1, NULL
+          );
         }
         else {
           target_rpm = value.toFloat();
@@ -245,10 +252,12 @@ void loop() {
     Serial.print(current_time);
     Serial.print(" ");
     Serial.println (avg_rpm);
-  }
 
-  // 6. MPU-6050 data
-  mpu_read();
+    // 6. MPU-6050 data
+    if (!is_calibrating) {
+      mpu_read();
+    }
+  }
 
   // 7. BLE message
   if (current_time - prev_noti_time >= 800) {
@@ -265,6 +274,8 @@ void loop() {
     pGlobalCharacteristic->setValue(output.c_str());
     pGlobalCharacteristic->notify();
   }
+
+  vTaskDelay(pdMS_TO_TICKS(1)); //Decoupling Time
 }
 
 /*========================================================*/
@@ -379,6 +390,8 @@ void mpu_read() {
 
 
 void mpu_calibration() {
+  is_calibrating = true;
+
   long ax_sum =0, ay_sum = 0, az_sum = 0;
   long gx_sum =0, gy_sum = 0, gz_sum = 0;
   const int samples = 500;
@@ -388,10 +401,10 @@ void mpu_calibration() {
   //1. Stop the motor momentarily and reset the offset
   float backup_target = target_rpm;
   target_rpm = 0;
-  analogWrite(EN_PIN, 0);
-  delay (750);
+  digitalWrite(SLEEP, 0);
   mpu.setXAccelOffset(0); mpu.setYAccelOffset(0); mpu.setZAccelOffset(0);
   mpu.setXGyroOffset(0);  mpu.setYGyroOffset(0);  mpu.setZGyroOffset(0);
+  vTaskDelay(pdMS_TO_TICKS(500));
 
   //2. Collect raw mpu data samples
   for (int i=0; i< samples; i++) {
@@ -400,6 +413,11 @@ void mpu_calibration() {
     ax_sum += rax; ay_sum += ray; az_sum += raz;
     gx_sum += rgx; gy_sum += rgy; gz_sum += rgz;
     delayMicroseconds(usDelay);
+
+    //Time-break for other BLE task
+    if (i % 20 == 0) {
+      vTaskDelay(pdMS_TO_TICKS(1));
+    }
   }
 
   //3. Calculate Offset
@@ -411,11 +429,13 @@ void mpu_calibration() {
   int gy_offset = -(gy_sum / samples) / 4;
   int gz_offset = -(gz_sum / samples) / 4;
 
-  //4. Apply clibrated offsets
+  //4. Apply calibrated offsets
   mpu.setXAccelOffset(ax_offset); mpu.setYAccelOffset(ay_offset); mpu.setZAccelOffset(az_offset);
   mpu.setXGyroOffset(gx_offset);  mpu.setYGyroOffset(gy_offset);  mpu.setZGyroOffset(gz_offset);
 
   //5. Return to original RPM
   target_rpm = backup_target;
-  analogWrite(EN_PIN, 1);
+  digitalWrite(SLEEP, 1);
+
+  is_calibrating = false;
 }

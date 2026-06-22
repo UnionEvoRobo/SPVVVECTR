@@ -22,7 +22,9 @@
 '''
 
 import asyncio
-from bleak import BleakClient
+import platform
+import re
+from bleak import BleakClient, BleakScanner
 
 class Strut:
     '''
@@ -60,13 +62,33 @@ class Strut:
     
     '========================================================================='
     '=============================BLE Communication==========================='
+    @staticmethod
+    def _is_mac_address(device_id: str) -> bool:
+        return bool(re.fullmatch(r"([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", device_id))
+
     async def connect(self) -> bool:
         '''
         Connects to the BLE device and starts notifications.\n
         @return: True if connection is successful, False otherwise.
         '''
-        self.client = BleakClient(self.config["address"])
         try:
+            device_id = self.config.get("identifier", self.config["address"])
+            if platform.system() == "Darwin" and self._is_mac_address(device_id):
+                # macOS does not expose BLE MAC addresses; resolve by advertised name.
+                scan_timeout = float(self.config.get("scan_timeout", 8.0))
+                device = await BleakScanner.find_device_by_filter(
+                    lambda d, ad: d.name == self.name or ad.local_name == self.name,
+                    timeout=scan_timeout
+                )
+                if device is None:
+                    raise RuntimeError(
+                        f"Device '{self.name}' not found on macOS scan. "
+                        "Set config['identifier'] to the macOS BLE UUID for stable pairing."
+                    )
+                self.client = BleakClient(device)
+            else:
+                self.client = BleakClient(device_id)
+
             await self.client.connect()
             _ = self.client.services
             if self.client.is_connected:
@@ -187,7 +209,7 @@ if __name__ == "__main__":
         '''
         Unit testing of the Strut Class
         '''
-        strut = Strut("Tensegrity-BT1", 
+        strut = Strut("SPVVVECTR1", 
                     {"address": "8C:94:DF:2B:28:E6", 
                     "service": "afcdeba4-f8a9-4ca1-baa5-021afe634998", 
                     "char": "83147421-2684-43ec-af39-58533d866c8e"})
