@@ -65,7 +65,6 @@ class Strut:
         Connects to the BLE device and starts notifications.\n
         @return: True if connection is successful, False otherwise.
         '''
-
         self.client = BleakClient(self.config["address"])
         try:
             await self.client.connect()

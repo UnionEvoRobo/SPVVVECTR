@@ -8,6 +8,8 @@ class SPVVVECTR():
     Including three ESP32 Strut PCBs, with overall robot control.
     '''
 
+    MAX_SPEED = 1000
+
     BOARDS_CONFIG = {
         "SPVVVECTR1": {"address": "8C:94:DF:2B:28:E6", 
                            "service": "afcdeba4-f8a9-4ca1-baa5-021afe634998", 
@@ -88,11 +90,16 @@ class SPVVVECTR():
         Set the speed to a specific strut by name and value.\n
         @param:
         - name: The name of the strut to set the speed for.
-        - value: An int between -700 and 700.
+        - value: An int with the absolute value less than MAX_SPEED.
         '''
         for strut_name, strut in self.struts.items():
-            if name in strut_name and strut.status == "ONLINE":
-                await strut.set_target_rpm(value)
+            if strut_name == name and strut.status == "ONLINE":
+                try:
+                    await strut.set_target_rpm(value)
+                    self.struts_data[name] = strut.get_ordered_data()
+                except Exception as e:
+                    print(f"Error setting speed for {name}: {e}")
+                break
 
     async def stop(self, name: str):
         '''
@@ -104,7 +111,7 @@ class SPVVVECTR():
     async def set_speed_all(self, value: int):
         '''
         Set all struts to the same speed by value.\n
-        @param: value: An int between -700 and 700.
+        @param: value: An int with the absolute value less than MAX_SPEED.
         '''
         tasks = []
         for strut in self.struts.values():
@@ -116,6 +123,14 @@ class SPVVVECTR():
         Stop all struts.
         '''
         await self.set_speed_all(0)
+    
+    async def calibrate(self, name: str):
+        '''
+        Calibrate the MPU6050 IMU of a specific strut by name.\n
+        @param: name: The name of the strut to calibrate.
+        '''
+        if name in self.struts and self.struts[name].status == "ONLINE":
+            await self.struts[name].mpu_calibrate()
 
     '========================================================================='
     '=======================Receiving data and Parsing========================'

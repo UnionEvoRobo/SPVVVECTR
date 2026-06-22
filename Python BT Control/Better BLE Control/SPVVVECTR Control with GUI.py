@@ -73,13 +73,13 @@ def main():
         global global_speed
         try:
             global_speed = int(event.widget.get())
-            await robot.set_speed_all(global_speed)
-            if abs(global_speed) < 701:
+            if abs(global_speed) <= robot.MAX_SPEED:
+                await robot.set_speed_all(global_speed)
                 global_message.set(f"Global speed set to {global_speed} RPM")
             else:
                 Invalid_speed()
         except:
-            Invalid_speed()
+            global_message.set("Hello")
     entry5 = tk.Entry(root, width=cell_width)
     entry5.grid(row = CURR_ROW, column = 4)
     entry5.bind("<Return>", lambda event: 
@@ -124,7 +124,7 @@ def main():
         async def set_strut_speed(event):
             try:
                 speed = int(event.widget.get())
-                if abs(speed) < 701:
+                if abs(speed) <= robot.MAX_SPEED:
                     await robot.set_speed(name, speed)
                 else:
                     pass 

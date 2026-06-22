@@ -381,7 +381,7 @@ void mpu_read() {
 void mpu_calibration() {
   long ax_sum =0, ay_sum = 0, az_sum = 0;
   long gx_sum =0, gy_sum = 0, gz_sum = 0;
-  const int samples = 700;
+  const int samples = 500;
   const int usDelay = 3150;
 
   /*  Stop the motor briefly and calibrate the MPU6050*/
