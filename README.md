@@ -9,8 +9,10 @@
 (This code is reuploaded)
 
 ### Code used:
-1. PID_Pulse_Period_and_BLE.ino
+1. SPVVVECCTR-MCU-PP-BLE.ino
 - This is the code needed to operate the microcontroller ESP32 on each strut
+- This code uses Pulse Period to calculate RPM
+- This code uses BLE (Bluetooth Low-Energy) for Communication.
 - Flash this code onto each microcontroller before running the Python BLE code
 
 2. BLE_Control.py
@@ -19,12 +21,12 @@
 - This is the primitive version of the control
 
 3. Better BLE Control
-- In development
-- Will use OOP technique to simplify the code structure, with the aim of improving code readability and modularity
-- Aim to integrate the built-in Tkinter GUI to make the data reading more readable
+- Development finished (6/22/2026)
+- Provides the Object Classes for each PCB Strut, for the entire SPECTR robot (6 bar-3PCB), and the GUI for the controller.
+- Intended for Windows
 
 4. Other notes:
 - The Classic Bluetooth version is also usable, albeit not as well as developed as the BLE version
 - This code will require 3 COM ports space on the laptop, so make sure you have some ports available
-- PID_Pulse_period_and_classicBT.ino
+- SPVVVECCTR-MCU-PP-BT.ino
 - ClassicBT_Control.py
