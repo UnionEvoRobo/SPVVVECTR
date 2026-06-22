@@ -12,7 +12,7 @@
     - get_target_rpm()
     - get_actual_rpm()
     - get_imu_data()
-    - get_ordered_data()
+    - get_ordered_data()n
 
 
     @author: Duy Hung Dang
@@ -115,11 +115,11 @@ class Strut:
             self.gyro_y = float(parts[6])
             self.gyro_z = float(parts[7])
         except ValueError as e:
-            print("Parse error:")
+            print("Parse error:", e)
 
 
     '========================================================================='
-    '===============================Motor Control============================='
+    '============================Sending BLE CMD=============================='
     async def set_target_rpm(self, rpm: int):
         '''
         Sets the target RPM for the strut's motor and sends the command via BLE.
@@ -131,6 +131,16 @@ class Strut:
             asyncio.create_task(
                 self.client.write_gatt_char(self.config["char"], 
                                             str(rpm).encode(), 
+                                            response=False))
+    
+    async def mpu_calibrate(self):
+        '''
+        Sends a command to calibrate the MPU6050 IMU.
+        '''
+        if self.client and self.client.is_connected:
+            asyncio.create_task(
+                self.client.write_gatt_char(self.config["char"], 
+                                            'calibrate'.encode(), 
                                             response=False))
 
 
@@ -196,8 +206,19 @@ if __name__ == "__main__":
             user_cont = input("Continue? (y/n): ")
             if user_cont.lower() != 'y':
                 print (strut.get_ordered_data())
+                await strut.disconnect()
                 break
-        await strut.disconnect()
+                
+            calibrate = input("Calibrate IMU? (y/n): ")
+            if calibrate.lower() == 'y':
+                await strut.mpu_calibrate()
+                print("Calibration command sent.")
+                await asyncio.sleep(1)  # Wait a bit to receive updates
+            print (strut.get_ordered_data())
+        try:
+            await strut.disconnect()
+        except Exception as e:
+            pass
         print(strut.get_status())
 
     asyncio.run(main())

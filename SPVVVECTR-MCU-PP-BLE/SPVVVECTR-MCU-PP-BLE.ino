@@ -92,12 +92,13 @@ int filter_idx = 0;
 float raw_rpm = 0;
 float avg_rpm = 0;
 
-// PID and Timing variables
+// Misc
 unsigned long prev_loop_time = 0;
 unsigned long prev_noti_time = 0;
 const float period_ms = 50; 
 float target_rpm = 0.0;                         //Set initial RPM here
 float speed = 0;                                //Set initial speed here
+const int MAX_RPM = 1000;                       //Set Maximum RPM here
 
 // PID  Controller Variables (Adjusted for 16-bit PWM)
 const float kP = 3;
@@ -105,15 +106,35 @@ const float kD = 0.5;
 float error = 0;
 float last_error = 0;
 
+
+/*========================================================*/
+/*                          Function                      */
+void IRAM_ATTR countPulse();
+void pin_setup();
+void mpu_setup();
+void ble_setup();
+void mpu_calibration();
+
+
+/*========================================================*/
+/*                       BLE CallBacks                    */
 // Callback class to handle incoming BLE writes
 class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
       String value = pCharacteristic->getValue().c_str();
+      value.trim();
       if (value.length() > 0) {
-        target_rpm = value.toFloat();
-        target_rpm = constrain(target_rpm, -700, 700);
-        Serial.print("New Target RPM via BLE: ");
-        Serial.println(target_rpm);
+        if (value.equalsIgnoreCase("calibrate")) {
+          //BLE IMU Calibration
+          mpu_calibration();
+        }
+        else {
+          target_rpm = value.toFloat();
+          //BLE Set Target Speed
+          target_rpm = constrain(target_rpm, -1-MAX_RPM, 1+MAX_RPM);
+          Serial.print("New Target RPM via BLE: ");
+          Serial.println(target_rpm);
+        }
       }
     }
 };
@@ -136,17 +157,6 @@ class MyServerCallbacks: public BLEServerCallbacks {
         );
     }
 };
-
-
-
-/*========================================================*/
-/*            Function  and Task Prototype                */
-void IRAM_ATTR countPulse();
-void pin_setup();
-void mpu_setup();
-void ble_setup();
-void mpu_calibration();
-
 
 /*========================================================*/
 /*                  Main setup function                   */
@@ -369,16 +379,43 @@ void mpu_read() {
 
 
 void mpu_calibration() {
-  mpu.CalibrateAccel(6);
-  mpu.CalibrateGyro(6);
+  long ax_sum =0, ay_sum = 0, az_sum = 0;
+  long gx_sum =0, gy_sum = 0, gz_sum = 0;
+  const int samples = 700;
+  const int usDelay = 3150;
 
-  Serial.print("Accel Offsets: ");
-  Serial.print(mpu.getXAccelOffset()); Serial.print("\t");
-  Serial.print(mpu.getYAccelOffset()); Serial.print("\t");
-  Serial.println(mpu.getZAccelOffset());
-  
-  Serial.print("Gyro Offsets: ");
-  Serial.print(mpu.getXGyroOffset()); Serial.print("\t");
-  Serial.print(mpu.getYGyroOffset()); Serial.print("\t");
-  Serial.println(mpu.getZGyroOffset());
+  /*  Stop the motor briefly and calibrate the MPU6050*/
+  //1. Stop the motor momentarily and reset the offset
+  float backup_target = target_rpm;
+  target_rpm = 0;
+  analogWrite(EN_PIN, 0);
+  delay (750);
+  mpu.setXAccelOffset(0); mpu.setYAccelOffset(0); mpu.setZAccelOffset(0);
+  mpu.setXGyroOffset(0);  mpu.setYGyroOffset(0);  mpu.setZGyroOffset(0);
+
+  //2. Collect raw mpu data samples
+  for (int i=0; i< samples; i++) {
+    int16_t rax, ray, raz, rgx, rgy, rgz;
+    mpu.getMotion6(&rax, &ray, &raz, &rgx, &rgy, &rgz);
+    ax_sum += rax; ay_sum += ray; az_sum += raz;
+    gx_sum += rgx; gy_sum += rgy; gz_sum += rgz;
+    delayMicroseconds(usDelay);
+  }
+
+  //3. Calculate Offset
+  int ax_offset = -(ax_sum / samples) / 8;
+  int ay_offset = -(ay_sum / samples) / 8;
+  int az_offset = (16384 - (az_sum / samples)) / 8; 
+  //Factoring gravity constant in az.
+  int gx_offset = -(gx_sum / samples) / 4;
+  int gy_offset = -(gy_sum / samples) / 4;
+  int gz_offset = -(gz_sum / samples) / 4;
+
+  //4. Apply clibrated offsets
+  mpu.setXAccelOffset(ax_offset); mpu.setYAccelOffset(ay_offset); mpu.setZAccelOffset(az_offset);
+  mpu.setXGyroOffset(gx_offset);  mpu.setYGyroOffset(gy_offset);  mpu.setZGyroOffset(gz_offset);
+
+  //5. Return to original RPM
+  target_rpm = backup_target;
+  analogWrite(EN_PIN, 1);
 }
