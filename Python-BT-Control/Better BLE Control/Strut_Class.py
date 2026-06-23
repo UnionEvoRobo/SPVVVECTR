@@ -66,7 +66,7 @@ class Strut:
     def _is_mac_address(device_id: str) -> bool:
         return bool(re.fullmatch(r"([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", device_id))
 
-    async def connect_windows(self) -> bool:
+    async def connect(self) -> bool:
         '''
         Connects to the BLE device and starts notifications.\n
         @return: True if connection is successful, False otherwise.
@@ -227,6 +227,8 @@ if __name__ == "__main__":
             user_cont = input("Continue? (y/n): ")
             if user_cont.lower() != 'y':
                 print (strut.get_ordered_data())
+                await strut.set_target_rpm(0)
+                await asyncio.sleep(2)
                 await strut.disconnect()
                 break
                 
@@ -237,6 +239,7 @@ if __name__ == "__main__":
                 await asyncio.sleep(1)  # Wait a bit to receive updates
             print (strut.get_ordered_data())
         try:
+            await strut.set_target_rpm(0)
             await strut.disconnect()
         except Exception as e:
             pass
