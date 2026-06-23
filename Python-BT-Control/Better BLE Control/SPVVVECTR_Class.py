@@ -209,7 +209,7 @@ class SPVVVECTR():
     '========================================================================='
     '=======================Recording data to CSV File========================'
 
-    async def choose_working_directory(self, directory: str):
+    async def set_working_directory(self, directory: str):
         '''
         Set the working directory for saving CSV files.\n
         @param: directory: The path to the desired working directory.

@@ -1,7 +1,10 @@
 from SPVVVECTR_Class import SPVVVECTR
 import tkinter as tk
+from tkinter import filedialog
 import asyncio
 import threading, asyncio
+import os
+import textwrap
 
 
 global_speed = 0
@@ -79,39 +82,43 @@ def main():
             else:
                 Invalid_speed()
         except:
-            global_message.set("Hello")
+            Invalid_speed()
     entry5 = tk.Entry(root, width=cell_width)
     entry5.grid(row = CURR_ROW, column = 4)
     entry5.bind("<Return>", lambda event: 
                 asyncio.run_coroutine_threadsafe(global_speed_entry(event), loop))
 
-    CURR_ROW += 1
-
-    #Start/ Stop Recording Button:
-    def toggle_recording():
-        nonlocal recording_status
-        recording_status = not recording_status
-        if recording_status:
-            recording_message.set("Recording: ON")
-            asyncio.run_coroutine_threadsafe(robot.start_recording(), loop)
-        else:
-            recording_message.set("Recording: OFF")
-            asyncio.run_coroutine_threadsafe(robot.stop_recording(), loop)
-    button9= tk.Button(root, text="Toggle Recording", width=cell_width, command=toggle_recording)
-    button9.grid(row = CURR_ROW, column = 4)
 
     CURR_ROW += 1
-    
-    #Global message display
-    label6 = tk.Label(root, text="Global Message:")
-    label6.grid(row = CURR_ROW, column = 0)
 
-    label7 = tk.Label(root, 
-                      textvariable=global_message,
-                      borderwidth=0.5,
-                      relief="solid"
-                      )
-    label7.grid(row = CURR_ROW, column = 1, columnspan = 2)
+
+    #Selecting working directory
+    curr_dir = "Not set"
+    def select_directory():
+        directory = filedialog.askdirectory(
+            title = "Select Working Directory"
+        )
+        nonlocal curr_dir
+        curr_dir = directory
+        short_dir = "..." + directory[-20:] if len(directory) > 20 else directory
+        work_dir.set(f"Working Directory: {short_dir}")
+        if directory:
+            asyncio.run_coroutine_threadsafe(
+                robot.set_working_directory(directory), loop)
+    button6 = tk.Button(root, 
+                        text="Select Working Directory", 
+                        width=cell_width, 
+                        command=select_directory)
+    button6.grid(row = CURR_ROW, column = 0)
+
+    work_dir = tk.StringVar()
+    work_dir.set(f"Working Directory: {curr_dir}")
+
+    label7 = tk.Label(root, textvariable=work_dir).grid(
+        row = CURR_ROW,
+        column = 1,
+        columnspan = 2
+    )
 
     #Recording Status
     recording_status = False
@@ -122,6 +129,34 @@ def main():
         recording_message.set("Recording: OFF")
     label8 = tk.Label(root, textvariable=recording_message)
     label8.grid(row = CURR_ROW, column = 3)
+
+    #Start/ Stop Recording Button:
+    def toggle_recording():
+        nonlocal recording_status
+        recording_status = not recording_status
+        if recording_status:
+            recording_message.set("Recording: ON")
+            asyncio.run_coroutine_threadsafe(robot.start_record(), loop)
+        else:
+            recording_message.set("Recording: OFF")
+            asyncio.run_coroutine_threadsafe(robot.stop_record(), loop)
+    button9= tk.Button(root, text="Toggle Recording", width=cell_width, command=toggle_recording)
+    button9.grid(row = CURR_ROW, column = 4)
+
+    
+    CURR_ROW += 1
+    
+    #Global message display
+    label10 = tk.Label(root, text="Global Message:")
+    label10.grid(row = CURR_ROW, column = 0)
+
+    label11 = tk.Label(root, 
+                      textvariable=global_message,
+                      borderwidth=0.5,
+                      relief="solid"
+                      )
+    label11.grid(row = CURR_ROW, column = 1, columnspan = 4)
+
     CURR_ROW += 1
 
 
@@ -172,7 +207,7 @@ def main():
     def calibrate_cmd(name):
         async def calibrate_strut():
             try:
-                await robot.calibrate_imu(name)
+                await robot.calibrate(name)
             except Exception as e:
                 print(f"Error calibrating IMU for {name}: {e}")
         return lambda: asyncio.run_coroutine_threadsafe(
