@@ -132,14 +132,19 @@ def main():
 
     #Start/ Stop Recording Button:
     def toggle_recording():
-        nonlocal recording_status
-        recording_status = not recording_status
-        if recording_status:
-            recording_message.set("Recording: ON")
-            asyncio.run_coroutine_threadsafe(robot.start_record(), loop)
+        if curr_dir == "Not set":
+            global_message.set("Please select a working directory before recording.")
+            pass
         else:
-            recording_message.set("Recording: OFF")
-            asyncio.run_coroutine_threadsafe(robot.stop_record(), loop)
+            nonlocal recording_status
+            recording_status = not recording_status
+            if recording_status:
+                recording_message.set("Recording: ON")
+                asyncio.run_coroutine_threadsafe(robot.start_record(), loop)
+            else:
+                recording_message.set("Recording: OFF")
+                asyncio.run_coroutine_threadsafe(robot.stop_record(), loop)
+        
     button9= tk.Button(root, text="Toggle Recording", width=cell_width, command=toggle_recording)
     button9.grid(row = CURR_ROW, column = 4)
 
