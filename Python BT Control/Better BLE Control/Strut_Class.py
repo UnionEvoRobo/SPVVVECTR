@@ -66,7 +66,7 @@ class Strut:
     def _is_mac_address(device_id: str) -> bool:
         return bool(re.fullmatch(r"([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", device_id))
 
-    async def connect(self) -> bool:
+    async def connect_windows(self) -> bool:
         '''
         Connects to the BLE device and starts notifications.\n
         @return: True if connection is successful, False otherwise.

@@ -87,7 +87,21 @@ def main():
 
     CURR_ROW += 1
 
+    #Start/ Stop Recording Button:
+    def toggle_recording():
+        nonlocal recording_status
+        recording_status = not recording_status
+        if recording_status:
+            recording_message.set("Recording: ON")
+            asyncio.run_coroutine_threadsafe(robot.start_recording(), loop)
+        else:
+            recording_message.set("Recording: OFF")
+            asyncio.run_coroutine_threadsafe(robot.stop_recording(), loop)
+    button9= tk.Button(root, text="Toggle Recording", width=cell_width, command=toggle_recording)
+    button9.grid(row = CURR_ROW, column = 4)
 
+    CURR_ROW += 1
+    
     #Global message display
     label6 = tk.Label(root, text="Global Message:")
     label6.grid(row = CURR_ROW, column = 0)
@@ -97,8 +111,17 @@ def main():
                       borderwidth=0.5,
                       relief="solid"
                       )
-    label7.grid(row = CURR_ROW, column = 1, columnspan = 4)
+    label7.grid(row = CURR_ROW, column = 1, columnspan = 2)
 
+    #Recording Status
+    recording_status = False
+    recording_message = tk.StringVar()
+    if recording_status:
+        recording_message.set("Recording: ON")
+    else:
+        recording_message.set("Recording: OFF")
+    label8 = tk.Label(root, textvariable=recording_message)
+    label8.grid(row = CURR_ROW, column = 3)
     CURR_ROW += 1
 
 
@@ -146,6 +169,14 @@ def main():
         return lambda event: asyncio.run_coroutine_threadsafe(
             set_strut_speed(event), loop)
 
+    def calibrate_cmd(name):
+        async def calibrate_strut():
+            try:
+                await robot.calibrate_imu(name)
+            except Exception as e:
+                print(f"Error calibrating IMU for {name}: {e}")
+        return lambda: asyncio.run_coroutine_threadsafe(
+            calibrate_strut(), loop)
 
     #Display struts data:
     for i in range(3):
@@ -207,13 +238,21 @@ def main():
             column = col_offset
         )
 
+        #MPU Calibration button
+        tk.Button(root, text="Calibrate IMU", width=cell_width,
+                    command=calibrate_cmd(name)).grid(
+                row = CURR_ROW+7,
+                column = col_offset
+            )
+
+
         #Reference to UI elements for data update
         ui_registry[name] = {
             'status': status_var,
             'rpm': rpm_message,
             'imu': imu_message
         }
-    CURR_ROW += 7
+    CURR_ROW += 8
 
     #Update data:
     async def update_data():
