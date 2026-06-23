@@ -1,4 +1,4 @@
-from SPVVVECTR_BLE_Control import SPVVVECTR
+from SPVVVECTR_Class import SPVVVECTR
 import tkinter as tk
 import asyncio
 import threading, asyncio

@@ -1,4 +1,4 @@
-from SPVVVECTR_BLE_Control import SPVVVECTR
+from SPVVVECTR_Class import SPVVVECTR
 import tkinter as tk
 import asyncio
 import threading, asyncio
@@ -120,6 +120,19 @@ def main():
         return lambda: asyncio.run_coroutine_threadsafe(
             connect_strut(), loop)
     
+    def disconnect_cmd(name, status_var):
+        async def disconnect_strut():
+            curr_status = ui_registry[name]['status'].get()
+            if status_var.get() == "ONLINE":
+                try:
+                    await robot.disconnect_strut(name)
+                except Exception as e:
+                    print(f"Error disconnecting from {name}: {e}")
+            else:
+                pass
+        return lambda: asyncio.run_coroutine_threadsafe(
+            disconnect_strut(), loop)
+    
     def set_speed_cmd(name):
         async def set_strut_speed(event):
             try:
@@ -161,11 +174,19 @@ def main():
             column = col_offset
         )
 
+        #Disconnect button
+        tk.Button(root, text="Disconnect", width=cell_width, 
+                  command=disconnect_cmd(name, status_var)
+                  ).grid(
+            row = CURR_ROW+3,
+            column = col_offset
+        )
+
         #Set Speed Entry
         speed_entry = tk.Entry(root, width=cell_width)
         speed_entry.insert(0, "Set Target RPM")
         speed_entry.grid(
-            row = CURR_ROW+3,
+            row = CURR_ROW+4,
             column = col_offset
         )
         speed_entry.bind("<Return>", set_speed_cmd(name))
@@ -174,7 +195,7 @@ def main():
         rpm_message = tk.StringVar()
         rpm_message.set("Target RPM: N/A\nActual RPM: N/A")
         tk.Label(root, textvariable=rpm_message, height=2).grid(
-            row = CURR_ROW+4,
+            row = CURR_ROW+5,
             column = col_offset 
         )
 
@@ -182,7 +203,7 @@ def main():
         imu_message = tk.StringVar()
         imu_message.set("Accel: N/A\nGyro: N/A")
         tk.Label(root, textvariable=imu_message, height=2).grid(
-            row = CURR_ROW+5,
+            row = CURR_ROW+6,
             column = col_offset
         )
 
@@ -192,7 +213,7 @@ def main():
             'rpm': rpm_message,
             'imu': imu_message
         }
-    CURR_ROW += 6
+    CURR_ROW += 7
 
     #Update data:
     async def update_data():

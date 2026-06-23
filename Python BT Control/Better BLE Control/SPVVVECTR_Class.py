@@ -1,6 +1,9 @@
 import asyncio
 import copy
-from PCB_Strut import Strut
+from Strut_Class import Strut
+import csv
+from datetime import datetime
+import os
 
 class SPVVVECTR():
     '''
@@ -8,7 +11,7 @@ class SPVVVECTR():
     Including three ESP32 Strut PCBs, with overall robot control.
     '''
 
-    MAX_SPEED = 1000
+    MAX_SPEED = 1000  #Change this if needed
 
     BOARDS_CONFIG = {
         "SPVVVECTR1": {"address": "8C:94:DF:2B:28:E6", 
@@ -41,6 +44,8 @@ class SPVVVECTR():
         self.struts = {name: Strut(name, cfg) for name, cfg in self.config.items()}
         self.struts_data = {name: None for name in self.config}
         self.struts_status = {name: "OFFLINE" for name in self.config}
+        self.is_recording = False
+        self.record_task = None
     
     '========================================================================='
     '===============================BLE Connection============================'
@@ -199,7 +204,70 @@ class SPVVVECTR():
         await asyncio.sleep(0.2)
         await self.update_all_strut_data()
         return copy.copy(self.struts_data)
+    
 
+    '========================================================================='
+    '=======================Recording data to CSV File========================'
+
+    async def choose_working_directory(self, directory: str):
+        '''
+        Set the working directory for saving CSV files.\n
+        @param: directory: The path to the desired working directory.
+        '''
+        if os.path.isdir(directory):
+            os.chdir(directory)
+            print(f"Working directory set to: {directory}")
+        else:
+            print(f"Invalid directory: {directory}")
+
+    async def start_record(self):
+        if not self.is_recording and self.record_task is None:
+            self.is_recording = True
+            self.record_task = asyncio.create_task(self.record())
+    
+    async def stop_record(self):
+        self.is_recording = False
+        self.record_task = None
+    
+    async def record(self):
+        csv_file = f"SPVVVECTR_data_{datetime.now().strftime('%m%d%Y_%H%M%S')}.csv"
+        headers = []
+        for name in self.struts:
+            headers.extend([f"{name}_timestamp",
+                            "Target_RPM",
+                            "Actual_RPM", 
+                            "Accel_X", 
+                            "Accel_Y", 
+                            "Accel_Z", 
+                            "Gyro_X", 
+                            "Gyro_Y", 
+                            "Gyro_Z",
+                            " " ]) #Blank column for separation
+        with open(csv_file, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(headers)
+
+        while self.is_recording:
+            if any(status == "ONLINE" for status in self.struts_status.values()):
+                await self.update_all_strut_data()
+                row = []
+                for name in self.struts:
+                    if self.struts_status[name] == "ONLINE":
+                        data = self.struts_data[name]
+                        timestamp = f'="{datetime.now().strftime("%H:%M:%S.%f")[:-3]}"'
+                        row.extend([timestamp] + data + [" "])  
+                    else:
+                        row.extend(["OFFLINE"] + ["N/A"] * 8 + [" "])
+                with open(csv_file, mode='a', newline='') as file:
+                    writer = csv.writer(file)
+                    writer.writerow(row)
+            if not self.is_recording:
+                break
+            await asyncio.sleep(0.1)
+
+
+'========================================================================='
+'=================================Testing================================='
 if __name__ == "__main__":
     async def test_1():
         '''Unit testing of the SPVVVECTR class - only SPVVVECTR1 for now.'''
@@ -230,29 +298,51 @@ if __name__ == "__main__":
 
     async def test_2():
         '''Unit testing of the SPVVVECTR class - connecting to all struts.'''
-        robot = SPVVVECTR()
-        print (await robot.get_all_strut_data())
 
-        init = input("Press Enter to connect to all struts...")
-        await robot.connect_all()
-        print (await robot.get_all_strut_data())
+        robot = SPVVVECTR()
+        print ("Robot initialized.")
+
+        work_dir = input("Enter working directory for CSV files: ")
+        await robot.choose_working_directory(work_dir)
 
         while True:
-            speed = input("Target RPM for all struts: ")
-            try:
-                await robot.set_speed_all(int(speed))
-            except ValueError:
-                print ("Set Speed Error.")
-            print (await robot.get_all_strut_data())
-
-            stop_trig = input("Stop all struts? (y/n): ")
-            if stop_trig.lower() == 'y':
-                await robot.stop_all()
-                print (await robot.get_all_strut_data())
-                break
-
-            await asyncio.sleep(1) 
+            user_input = input("Choose a number:\n"
+                               "1. Connect All\n2. Disconnect All\n" 
+                               "3. Set Speed All\n4. Stop All\n" 
+                               "5. Calibrate All\n6. Get Data All\n"
+                               "7. Start Recording\n8. Stop Recording\n"
+                               "9. Exit\n")
+            match user_input:
+                case "1":
+                    await robot.connect_all()
+                    print (await robot.get_all_status())
+                case "2":
+                    await robot.disconnect_all()
+                    print (await robot.get_all_status())
+                case "3":
+                    speed = input("Target RPM: ")
+                    try:
+                        await robot.set_speed_all(int(speed))
+                    except ValueError:
+                        print ("Set Speed Error.")
+                case "4":
+                    await robot.stop_all()
+                case "5":
+                    for name in robot.struts:
+                        await robot.calibrate(name)
+                case "6":
+                    print (await robot.get_all_strut_data())
+                case "7":
+                    await robot.start_record()
+                case "8":
+                    await robot.stop_record()
+                case "9":
+                    break
+                case _:
+                    print ("Invalid input. Please try again.")
+            await asyncio.sleep(0.5)
+        
         await robot.disconnect_all()
-        print (await robot.get_all_strut_data())
+        print("Test completed.")
 
-    asyncio.run(test_1())
+    asyncio.run(test_2())
