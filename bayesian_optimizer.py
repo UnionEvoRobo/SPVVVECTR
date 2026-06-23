@@ -11,8 +11,8 @@ def black_box_function(x):
 
 # visualizing blackbox function (nothing being optimized)
 # .linespace generates arr of 10,000 elements between 1 and 4 orderly
-#.reshape translates the arr into a 10,000x1 matrix (use -1 for row-nums to tell computer to figure it out instead of manuelly typing)
-x = np.linspace(-4, 4, 10000).reshape(-1, 1)
+#.reshape translates the arr into a 10,000x1 matrix (use -1 for row-nums to tell computer to figure it out instead of manuelly typing); (rows, cols) notation; opposite of math
+x = np.linspace(-4, 4, 10000).reshape(-1, 1) 
 y = black_box_function(x)
 
 plt.plot(x, y)
