@@ -25,6 +25,7 @@ import asyncio
 import platform
 import re
 from bleak import BleakClient, BleakScanner
+import copy
 
 class Strut:
     '''
@@ -202,19 +203,14 @@ class Strut:
         Returns all strut's data in an ordered list for easier processing.\n
         [Target_RPM, Actual_RPM, acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z]
         '''
-        return [self.Target_RPM, self.Actual_RPM, 
-                self.acc_x, self.acc_y, self.acc_z, 
-                self.gyro_x, self.gyro_y, self.gyro_z]
+        ordered_data = copy.deepcopy([
+            self.Target_RPM, self.Actual_RPM, 
+            self.acc_x, self.acc_y, self.acc_z, 
+            self.gyro_x, self.gyro_y, self.gyro_z])
+        return ordered_data
 
 
 if __name__ == "__main__":
-
-    async def update_data(strut: Strut):
-        while True:
-            data = strut.get_ordered_data()
-            await asyncio.sleep(1)
-            return data
-
     async def main():
         '''
         Unit testing of the Strut Class
@@ -232,7 +228,7 @@ if __name__ == "__main__":
                         "char": "83147421-2684-43ec-af39-58533d866c8e"})
         
         print ("Strut intialized.")
-        data = ()
+        asyncio.create_task(update_data(strut))
 
         while True:
             user_input = input("Choose a number:\n"
@@ -262,7 +258,8 @@ if __name__ == "__main__":
                     await strut.mpu_calibrate()
                     print("Strut calibrated.")
                 case "7":
-                    data = await update_data(strut)
+                    await asyncio.sleep(0)
+                    data = strut.get_ordered_data()
                     print(f"Strut data: {data}")
                 case "8":
                     break

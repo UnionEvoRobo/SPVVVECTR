@@ -165,6 +165,7 @@ class SPVVVECTR():
         '''
         if name in self.struts:
             try:
+                await asyncio.sleep(0)
                 self.struts_data[name] = self.struts[name].get_ordered_data()
             except Exception as e:
                 print(f"Error updating data for {name}: {e}")
