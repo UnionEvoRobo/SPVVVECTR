@@ -37,13 +37,17 @@ String name = "SPVVVECTR2";
 String name = "SPVVVECTR3";
 #define SERVICE_UUID        "e132a2ee-a68a-4b4b-98fa-29ef8bbc0be2"
 #define CHARACTERISTIC_UUID "ccba8d13-8743-45f7-9fd9-69a20a9acddc"
+
+String name = "test_board";
+#define SERVICE_UUID        "900ec402-1a33-4c94-a3d7-076951f68065"
+#define CHARACTERISTIC_UUID "cf9ecefe-a9f3-4087-af6a-cf7a6f917750"
 */
 
 
 /*      BLE variables: Change name and UUID here      */
-String name = "SPVVVECTR3";
-#define SERVICE_UUID        "e132a2ee-a68a-4b4b-98fa-29ef8bbc0be2"
-#define CHARACTERISTIC_UUID "ccba8d13-8743-45f7-9fd9-69a20a9acddc"
+String name = "test_board";
+#define SERVICE_UUID        "900ec402-1a33-4c94-a3d7-076951f68065"
+#define CHARACTERISTIC_UUID "cf9ecefe-a9f3-4087-af6a-cf7a6f917750"
 
 BLECharacteristic *pGlobalCharacteristic; 
 bool sprint = true;
@@ -55,8 +59,8 @@ const int PH_PIN    = 26;                  //Note: Old board uses 25
 const int SLEEP     = 27;                  //Note: Not on old board
 const int A         = 33;
 const int B         = 34; 
-const int MPU_SDA   = 21;
-const int MPU_SCL   = 22;
+const int MPU_SDA   = 8;
+const int MPU_SCL   = 9;
 const int INT       = 9;
 
 
@@ -113,6 +117,7 @@ float last_error = 0;
 void IRAM_ATTR countPulse();
 void pin_setup();
 void mpu_setup();
+void mpu_read();
 void ble_setup();
 void mpu_calibration();
 
@@ -170,7 +175,7 @@ class MyServerCallbacks: public BLEServerCallbacks {
 void setup() {
 
   Serial.begin (115200);
-  pin_setup();
+  //pin_setup();
   ble_setup();
   mpu_setup();
   mpu_read();
@@ -190,7 +195,7 @@ void loop() {
     prev_loop_time = current_time;
 
     // 1. Get Encoder data (pulse period)
-    noInterrupts();
+    /*noInterrupts();
     long d_micros = delta_micros;
     int d_dir = direction;
     unsigned long last_p = last_pulse_time;
@@ -251,11 +256,19 @@ void loop() {
     }
     Serial.print(current_time);
     Serial.print(" ");
-    Serial.println (avg_rpm);
+    Serial.println (avg_rpm);*/
 
     // 6. MPU-6050 data
     if (!is_calibrating) {
       mpu_read();
+      Serial.print("a:\t");
+      Serial.print(ax); Serial.print("\t");
+      Serial.print(ay); Serial.print("\t");
+      Serial.println(az);
+      Serial.print("g:\t");
+      Serial.print(gx); Serial.print("\t");
+      Serial.print(gy); Serial.print("\t");
+      Serial.println(gz);
     }
   }
 
@@ -335,8 +348,9 @@ void mpu_setup(){
 
 
 void ble_setup() {
-  //BLE initialization, create a server and a service
+  //BLE initialization, MTU packet size, create a server and a service
   BLEDevice::init(name);
+  BLEDevice::setMTU(512);
   BLEServer *pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
   BLEService *pService = pServer->createService(SERVICE_UUID);
@@ -362,7 +376,7 @@ void ble_setup() {
   BLEAdvertising *pAdvertising = pServer->getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
   
-  pAdvertising->setScanResponse(false); 
+  pAdvertising->setScanResponse(true); 
   pAdvertising->setMinPreferred(0x00);  // Clear preferred settings
   pAdvertising->setMinPreferred(0x06);  // Then set them again
   

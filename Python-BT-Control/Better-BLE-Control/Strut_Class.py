@@ -126,17 +126,20 @@ class Strut:
         
         parts = [p.strip() for p in message.split(',')]
 
-        try:
-            self.Target_RPM = int(float(parts[0]))
-            self.Actual_RPM = int(float(parts[1]))
-            self.acc_x = float(parts[2])
-            self.acc_y = float(parts[3])
-            self.acc_z = float(parts[4])
-            self.gyro_x = float(parts[5])
-            self.gyro_y = float(parts[6])
-            self.gyro_z = float(parts[7])
-        except ValueError as e:
-            print("Parse error:", e)
+        if len(parts) == 8:
+            try:
+                self.Target_RPM = int(float(parts[0]))
+                self.Actual_RPM = int(float(parts[1]))
+                self.acc_x = float(parts[2])
+                self.acc_y = float(parts[3])
+                self.acc_z = float(parts[4])
+                self.gyro_x = float(parts[5])
+                self.gyro_y = float(parts[6])
+                self.gyro_z = float(parts[7])
+            except ValueError as e:
+                print("Parse error:", e)
+        else:
+            print(f"Unexpected BLE data format.")
 
 
     '========================================================================='
@@ -205,44 +208,65 @@ class Strut:
 
 
 if __name__ == "__main__":
+
+    async def update_data(strut: Strut):
+        while True:
+            data = strut.get_ordered_data()
+            await asyncio.sleep(1)
+            return data
+
     async def main():
         '''
         Unit testing of the Strut Class
         '''
+
+        #Find the BLE device name, address, and UUID in
+        #the Arduino code.
+        '''strut = Strut("test_board", 
+                    {"address": "70:AF:09:3B:B3:52", 
+                    "service": "900ec402-1a33-4c94-a3d7-076951f68065", 
+                    "char": "cf9ecefe-a9f3-4087-af6a-cf7a6f917750"})'''
         strut = Strut("SPVVVECTR1", 
-                    {"address": "8C:94:DF:2B:28:E6", 
-                    "service": "afcdeba4-f8a9-4ca1-baa5-021afe634998", 
-                    "char": "83147421-2684-43ec-af39-58533d866c8e"})
-        await strut.connect()
-        print (f"Strut Status: {strut.get_status()}")
+                      {"address": "8C:94:DF:2B:28:E6", 
+                        "service": "afcdeba4-f8a9-4ca1-baa5-021afe634998", 
+                        "char": "83147421-2684-43ec-af39-58533d866c8e"})
+        
+        print ("Strut intialized.")
+        data = ()
+
         while True:
-            speed = input("Target RPM: ")
-            try:
-                await strut.set_target_rpm(int(speed))
-            except ValueError:
-                print("Invalid RPM value. Please enter an integer.")
-            
-            await asyncio.sleep(1)  # Wait a bit to receive updates
-            
-            user_cont = input("Continue? (y/n): ")
-            if user_cont.lower() != 'y':
-                print (strut.get_ordered_data())
-                await strut.set_target_rpm(0)
-                await asyncio.sleep(2)
-                await strut.disconnect()
-                break
-                
-            calibrate = input("Calibrate IMU? (y/n): ")
-            if calibrate.lower() == 'y':
-                await strut.mpu_calibrate()
-                print("Calibration command sent.")
-                await asyncio.sleep(1)  # Wait a bit to receive updates
-            print (strut.get_ordered_data())
-        try:
-            await strut.set_target_rpm(0)
-            await strut.disconnect()
-        except Exception as e:
-            pass
-        print(strut.get_status())
+            user_input = input("Choose a number:\n"
+                               "1. Connect\n2. Disconnect\n" 
+                               "3. Get Status\n4. Set Speed\n"
+                               "5. Stop\n6. Calibrate\n" 
+                               "7. Get Data\n8. Exit\n")
+    
+            match user_input:
+                case "1":
+                    await strut.connect()
+                    print("Strut connected.")
+                case "2":
+                    await strut.disconnect()
+                    print("Strut disconnected.")
+                case "3":
+                    status = strut.get_status()
+                    print(f"Strut status: {status}")
+                case "4":
+                    rpm = int(input("Enter target RPM: "))
+                    await strut.set_target_rpm(rpm)
+                    print(f"Target RPM set to {rpm}.")
+                case "5":
+                    await strut.set_target_rpm(0)
+                    print("Motor stopped.")
+                case "6":
+                    await strut.mpu_calibrate()
+                    print("Strut calibrated.")
+                case "7":
+                    data = await update_data(strut)
+                    print(f"Strut data: {data}")
+                case "8":
+                    break
+                case _:
+                    print("Invalid option. Please try again.")
 
     asyncio.run(main())

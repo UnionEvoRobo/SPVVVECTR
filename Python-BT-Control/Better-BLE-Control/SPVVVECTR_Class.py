@@ -345,4 +345,4 @@ if __name__ == "__main__":
         await robot.disconnect_all()
         print("Test completed.")
 
-    asyncio.run(test_2())
+    asyncio.run(test_1())
