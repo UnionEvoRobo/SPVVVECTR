@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import math
 
+# TODO: next make matrix that has input parameters and output displacement: [x, y, z, d]
 path = '/Users/mirajpar/Documents/SPVVVECTR/qualisys_tsv_data'
 file_pattern = os.path.join(path, 'SPVVVECTR_test_*.tsv')
 tsv_files = glob.glob(file_pattern) # list of file paths in 'qualisys_tsv_data'
