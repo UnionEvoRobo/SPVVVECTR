@@ -1,13 +1,45 @@
-import csv
+import glob 
+import os
+import pandas as pd
+import numpy as np
+import math
 
-# reviewing 2d arrays as representing matrices
-# data = [[1, 1.2, 1.3, 1.4, 1.5], [2, 2.2, 2.3, 2.4, 2.5], [2, 2.2, 2.3, 2.4, 2.5]]
-# for row in data:
-#     for col in row:
-#         print(col)
+path = '/Users/mirajpar/Documents/SPVVVECTR/qualisys_tsv_data'
+file_pattern = os.path.join(path, 'SPVVVECTR_test_*.tsv')
+tsv_files = glob.glob(file_pattern) # list of file paths in 'qualisys_tsv_data'
 
+def calculate_displacements(tsv_files_toCheck):
+    """input a list of tsv mocap files (from qualisys) and output displacement for each trial as arr"""
+    fitness = []
+    # append displacement_i from trial_i to fitness vector 
+    for file_path in tsv_files:
+        file_name = os.path.basename(file_path)
+        print(f"\nMeasuring displacement for: {file_name}")
 
-# open csv file and parse only needed data:
-# (x_init, y_init, z_init) & (x_final, y_final, z_final)
-# calculate displacement as d = sqrt((x_final-x_init)^2 + (y_final-y_init)^2 + (z_final-z_init)^2)
+        df = pd.read_csv(file_path, skiprows=range(0, 13), delimiter='\t')
+        df = df[['top-strut X', 'Y', 'Z']].iloc[[0, -1]] # get only 1st and last row of desired cols
 
+        x1 = df.iloc[0, 0]
+        y1 = df.iloc[0, 1]
+        z1 = df.iloc[0, 2]
+
+        x2 = df.iloc[1,0]
+        y2 = df.iloc[1,1]
+        z2 = df.iloc[1,2]
+
+        d = math.sqrt((float(x2) - float(x1))**2 + (float(y2) - float(y1))**2 + (float(z2) - float(z1))**2)
+        d = float(f"{d:.4f}"[:-1])
+
+        print(f"d = {d}\n")
+        fitness.append(d)
+
+        return fitness
+
+def main():
+    path = '/Users/mirajpar/Documents/SPVVVECTR/qualisys_tsv_data'
+    file_pattern = os.path.join(path, 'SPVVVECTR_test_*.tsv')
+    tsv_files = glob.glob(file_pattern) # list of file paths in 'qualisys_tsv_data'
+    fitness = calculate_displacements(tsv_files)
+    print(fitness)
+
+main()
