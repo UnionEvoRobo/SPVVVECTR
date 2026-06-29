@@ -55,10 +55,11 @@ def get_actual_rpms(csv_files_tocheck):
     
 def get_vectors(qualisys_path, csv_path):
     """Parses the data folder to get label and feature vectors.
-    
-    Reads TSV and CSV files from hardcoded directory paths to calculate 
-    displacements and retrieve actual RPM configurations.
 
+    Args:
+        qualisys_path (str): The directory path containing the Qualisys TSV data files.
+        csv_path (str): The directory path containing the SPVVVECTR CSV data files.
+    
     Returns:
         tuple: A tuple containing:
             - label (numpy.ndarray): The array of displacements.
