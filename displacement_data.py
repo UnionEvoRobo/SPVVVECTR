@@ -52,11 +52,18 @@ def get_actual_rpms(csv_files_tocheck):
 
         gait_configs.append([float(df['S1_Target_RPM'].max()), float(df['S2_Target_RPM'].max()), float(df['S3_Target_RPM'].max())]) # getting .max() of each one because there may be points in trial where rpm=0
         return gait_configs
+    
+def get_vectors(qualisys_path, csv_path):
+    """Parses the data folder to get label and feature vectors.
+    
+    Reads TSV and CSV files from hardcoded directory paths to calculate 
+    displacements and retrieve actual RPM configurations.
 
-def main():
-    # paths for files
-    qualisys_path = '/Users/mirajpar/Documents/SPVVVECTR/data/tsv_data'
-    csv_path = '/Users/mirajpar/Documents/SPVVVECTR/data/csv-files'
+    Returns:
+        tuple: A tuple containing:
+            - label (numpy.ndarray): The array of displacements.
+            - feature_vector (numpy.ndarray): The array of rpm configs for SPVVVECTR.
+    """
 
     # common file naming schemes
     file_pattern_tsv = os.path.join(qualisys_path, 'SPVVVECTR_test_*.tsv')
@@ -70,10 +77,24 @@ def main():
     label = calculate_displacements(tsv_files)
     feature_vector = get_actual_rpms(csv_files)
 
-    print(f"label is: {label}\nFeature Vector is: {feature_vector}")
-
+    # translate both into np arrays 
     feature_vector = np.array(feature_vector)
     label = np.array(label)
+
+    return label, feature_vector
+
+def main():
+    # paths for files
+    qualisys_path = '/Users/mirajpar/Documents/SPVVVECTR/data/tsv_data'
+    csv_path = '/Users/mirajpar/Documents/SPVVVECTR/data/csv-files'
+    label, feature_vector = get_vectors(qualisys_path, csv_path)
+
+
+
+    # NEXT STEPS:
+    # 1. run several manuel physical trials to fill up feature and label vector 
+    # 2. implement bayesian optimizer 
+    # 3. pray ts works
 
     
 
