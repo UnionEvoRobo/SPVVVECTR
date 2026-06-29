@@ -234,9 +234,9 @@ class SPVVVECTR():
         csv_file = f"SPVVVECTR_data_{datetime.now().strftime('%m%d%Y_%H%M%S')}.csv"
         headers = []
         for name in self.struts:
-            headers.extend([f"{name}_timestamp",
-                            "Target_RPM",
-                            "Actual_RPM", 
+            headers.extend([f"S{name[-1]}_timestamp",
+                            f"S{name[-1]}_Target_RPM",
+                            f"S{name[-1]}_Actual_RPM", 
                             "Accel_X", 
                             "Accel_Y", 
                             "Accel_Z", 
