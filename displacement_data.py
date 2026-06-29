@@ -55,8 +55,8 @@ def get_actual_rpms(csv_files_tocheck):
 
 def main():
     # paths for files
-    qualisys_path = '/Users/mirajpar/Documents/SPVVVECTR/csv_data/tsv_data'
-    csv_path = '/Users/mirajpar/Documents/SPVVVECTR/csv_data/csv-files'
+    qualisys_path = '/Users/mirajpar/Documents/SPVVVECTR/data/tsv_data'
+    csv_path = '/Users/mirajpar/Documents/SPVVVECTR/data/csv-files'
 
     # common file naming schemes
     file_pattern_tsv = os.path.join(qualisys_path, 'SPVVVECTR_test_*.tsv')
