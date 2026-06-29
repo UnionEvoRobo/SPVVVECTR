@@ -54,14 +54,16 @@ bool sprint = true;
 
 
 /*            Declare the GPIO pins here              */
-const int EN_PIN    = 25;                  //Note: Old board uses 26
-const int PH_PIN    = 26;                  //Note: Old board uses 25
-const int SLEEP     = 27;                  //Note: Not on old board
-const int A         = 33;
-const int B         = 34; 
-const int MPU_SDA   = 8;
-const int MPU_SCL   = 9;
-const int INT       = 9;
+const int EN_PIN    = 1;                  
+const int PH_PIN    = 0;                  
+const int SLEEP     = 2;                 
+const int A         = 4;
+const int B         = 3; 
+const int MPU_SDA   = 6;
+const int MPU_SCL   = 7;
+
+const int PWM_BITS = 14;
+const int MAX_PWM = pow(2,14)-1;
 
 
 /*                Declare MPU6050 here                */
@@ -76,7 +78,7 @@ volatile bool is_calibrating = false;
 
 /*         Declare Encoder specifications here        */
 const float reduction_ratio = 10.0;         //Since the motor is 1:10 reduction
-const int   ppr_num = 7;                    //Inside encoder datasheet
+const int   ppr_num = 12;                    //Inside encoder datasheet
 const float hall_resolution = reduction_ratio * ppr_num; 
 
 //Encoder Pulse timer variables
@@ -88,7 +90,7 @@ volatile int  direction = 1;                //1 is CCW
 volatile unsigned long stall_timer = 0;
 const unsigned long STALL_THRESHOLD_MS = 1000;  //time before killing power
 const float MIN_SAFE_RPM = 20.0;                //minimum RPM to be considered "moving"
-const int MAX_SPEED = 65535 * 20/100;           //pwm driver is 16-bit
+const int MAX_SPEED = MAX_PWM * 20/100;           //pwm driver is 16-bit
 
 // Average calculation variables
 #define FILTER_SIZE 10
@@ -106,7 +108,7 @@ float speed = 0;                                //Set initial speed here
 const int MAX_RPM = 1000;                       //Set Maximum RPM here
 
 // PID  Controller Variables (Adjusted for 16-bit PWM)
-const float kP = 3;
+const float kP = 2;
 const float kD = 0.5;
 float error = 0;
 float last_error = 0;
@@ -174,8 +176,9 @@ class MyServerCallbacks: public BLEServerCallbacks {
 /*                  Main setup function                   */
 void setup() {
 
-  Serial.begin (115200);
-  //pin_setup();
+  Serial.begin(115200);
+  Serial.println("Hello.");
+  pin_setup();
   ble_setup();
   mpu_setup();
   mpu_read();
@@ -195,7 +198,7 @@ void loop() {
     prev_loop_time = current_time;
 
     // 1. Get Encoder data (pulse period)
-    /*noInterrupts();
+    noInterrupts();
     long d_micros = delta_micros;
     int d_dir = direction;
     unsigned long last_p = last_pulse_time;
@@ -220,8 +223,12 @@ void loop() {
     // 4. PID Speed calculation
     error = abs(target_rpm) - abs(avg_rpm);
     speed += kP * error + kD * (error - last_error) / (period_ms / 1000.0);
-    speed = constrain(speed, 0, 65535*80/100); 
     last_error = error;
+
+    if (abs(target_rpm) > 0 && speed < 1000) {
+      speed = 1000; // Minimum baseline 14-bit PWM to break gearbox friction
+    }
+    speed = constrain(speed, 0, MAX_PWM*80/100); 
 
     //4.5 Stall Detection Logic
     if (abs(target_rpm) > 0 && speed > MAX_SPEED && abs(avg_rpm) < MIN_SAFE_RPM) {
@@ -255,20 +262,16 @@ void loop() {
       analogWrite(EN_PIN, (int)speed);
     }
     Serial.print(current_time);
-    Serial.print(" ");
-    Serial.println (avg_rpm);*/
+    Serial.print("\t");
+    Serial.print(target_rpm);
+    Serial.print("\t");
+    Serial.print(avg_rpm);
+    Serial.print("\t");
+    Serial.println (speed);
 
     // 6. MPU-6050 data
     if (!is_calibrating) {
       mpu_read();
-      Serial.print("a:\t");
-      Serial.print(ax); Serial.print("\t");
-      Serial.print(ay); Serial.print("\t");
-      Serial.println(az);
-      Serial.print("g:\t");
-      Serial.print(gx); Serial.print("\t");
-      Serial.print(gy); Serial.print("\t");
-      Serial.println(gz);
     }
   }
 
@@ -309,11 +312,11 @@ void pin_setup(){
   pinMode(PH_PIN, OUTPUT);
   pinMode(SLEEP, OUTPUT);
 
-  pinMode(INT, INPUT_PULLUP);
+  //pinMode(INT, INPUT_PULLUP);
   pinMode(A, INPUT_PULLUP);
   pinMode(B, INPUT_PULLUP);
 
-  analogWriteResolution(EN_PIN, 16);
+  analogWriteResolution(EN_PIN, PWM_BITS);
   digitalWrite  (PH_PIN, 0);
   analogWrite   (EN_PIN, 0);
   digitalWrite  (SLEEP, 1);
