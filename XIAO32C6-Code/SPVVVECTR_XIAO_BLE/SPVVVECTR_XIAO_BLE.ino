@@ -54,13 +54,13 @@ bool sprint = true;
 
 
 /*            Declare the GPIO pins here              */
-const int EN_PIN    = 1;                  
-const int PH_PIN    = 0;                  
-const int SLEEP     = 2;                 
-const int A         = 4;
-const int B         = 3; 
-const int MPU_SDA   = 6;
-const int MPU_SCL   = 7;
+const int EN_PIN    = D10;                  
+const int PH_PIN    = D9;                  
+const int SLEEP     = D8;                 
+const int A         = D3;
+const int B         = D2; 
+const int MPU_SDA   = D4;
+const int MPU_SCL   = D5;
 
 const int PWM_BITS = 14;
 const int MAX_PWM = pow(2,14)-1;
@@ -78,7 +78,7 @@ volatile bool is_calibrating = false;
 
 /*         Declare Encoder specifications here        */
 const float reduction_ratio = 10.0;         //Since the motor is 1:10 reduction
-const int   ppr_num = 12;                    //Inside encoder datasheet
+const int   ppr_num = 7;                    //Inside encoder datasheet
 const float hall_resolution = reduction_ratio * ppr_num; 
 
 //Encoder Pulse timer variables
@@ -89,8 +89,8 @@ volatile int  direction = 1;                //1 is CCW
 //Stall Detection variables
 volatile unsigned long stall_timer = 0;
 const unsigned long STALL_THRESHOLD_MS = 1000;  //time before killing power
-const float MIN_SAFE_RPM = 20.0;                //minimum RPM to be considered "moving"
-const int MAX_SPEED = MAX_PWM * 20/100;           //pwm driver is 16-bit
+const float MIN_SAFE_RPM = 10.0;                //minimum RPM to be considered "moving"
+const int MAX_SPEED = MAX_PWM * 30/100;           //pwm driver is 16-bit
 
 // Average calculation variables
 #define FILTER_SIZE 10
@@ -225,10 +225,10 @@ void loop() {
     speed += kP * error + kD * (error - last_error) / (period_ms / 1000.0);
     last_error = error;
 
-    if (abs(target_rpm) > 0 && speed < 1000) {
-      speed = 1000; // Minimum baseline 14-bit PWM to break gearbox friction
+    if (abs(target_rpm) > 0 && speed < 500) {
+      speed = 500; // Minimum baseline 14-bit PWM to break gearbox friction
     }
-    speed = constrain(speed, 0, MAX_PWM*80/100); 
+    speed = constrain(speed, 0, MAX_PWM*90/100); 
 
     //4.5 Stall Detection Logic
     if (abs(target_rpm) > 0 && speed > MAX_SPEED && abs(avg_rpm) < MIN_SAFE_RPM) {
@@ -334,7 +334,7 @@ void mpu_setup(){
     Fastwire::setup(400, true);
   #endif
 
-  while (!Serial) {}
+  //while (!Serial) {}
 
   /*Initialize device and check connection*/ 
   Serial.println("Initializing MPU...");

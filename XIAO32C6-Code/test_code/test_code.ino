@@ -1,10 +1,10 @@
-const int EN_PIN    = 1;                  
-const int PH_PIN    = 0;                  
-const int SLEEP     = 2;                 
-const int A         = 4;
-const int B         = 3; 
-const int MPU_SDA   = 6;
-const int MPU_SCL   = 7;
+const int EN_PIN    = 10;                  
+const int PH_PIN    = 9;                  
+const int SLEEP     = 8;                 
+const int A         = 3;
+const int B         = 2; 
+const int MPU_SDA   = 4;
+const int MPU_SCL   = 5;
 
 
 void setup() {
@@ -20,13 +20,17 @@ void setup() {
 
   digitalWrite (PH_PIN, HIGH);
   analogWrite (EN_PIN, 4000);
-  delay(4000);
+  delay(1000);
 
   analogWrite(EN_PIN, 0);
-  delay(4000);
+  delay(1000);
 
   digitalWrite (PH_PIN, LOW);
   analogWrite (EN_PIN, 4000);
+  delay(1000);
+
+  analogWrite(EN_PIN, 0);
+  delay(1000);
 }
 
 void loop() {

@@ -219,7 +219,7 @@ if __name__ == "__main__":
         #Find the BLE device name, address, and UUID in
         #the Arduino code.
         strut = Strut("test_board", 
-                    {"address": "70:AF:09:3B:B3:52", 
+                    {"address": "58:E6:C5:1A:BF:DA", 
                     "service": "900ec402-1a33-4c94-a3d7-076951f68065", 
                     "char": "cf9ecefe-a9f3-4087-af6a-cf7a6f917750"})
         '''strut = Strut("SPVVVECTR1", 
