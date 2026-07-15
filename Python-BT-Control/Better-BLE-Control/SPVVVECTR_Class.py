@@ -11,7 +11,7 @@ class SPVVVECTR():
     Including three ESP32 Strut PCBs, with overall robot control.
     '''
 
-    MAX_SPEED = 1000  #Change this if needed
+    MAX_SPEED = 4095  #Change this if needed
 
     BOARDS_CONFIG = {
         "SPVVVECTR1": {"address": "8C:94:DF:2B:28:E6", 

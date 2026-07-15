@@ -41,10 +41,9 @@ String name = "SPVVVECTR3";
 
 
 /*      BLE variables: Change name and UUID here      */
-String name = "SPVVVECTR1";
-#define SERVICE_UUID        "afcdeba4-f8a9-4ca1-baa5-021afe634998"
-#define CHARACTERISTIC_UUID "83147421-2684-43ec-af39-58533d866c8e"
-
+String name = "SPVVVECTR3";
+#define SERVICE_UUID        "e132a2ee-a68a-4b4b-98fa-29ef8bbc0be2"
+#define CHARACTERISTIC_UUID "ccba8d13-8743-45f7-9fd9-69a20a9acddc"
 BLECharacteristic *pGlobalCharacteristic; 
 bool sprint = true;
 
@@ -73,7 +72,13 @@ volatile bool is_calibrating = false;
 /*         Declare Encoder specifications here        */
 const float reduction_ratio = 10.0;         //Since the motor is 1:10 reduction
 const int   ppr_num = 7;                    //Inside encoder datasheet
-const float hall_resolution = reduction_ratio * ppr_num; 
+const float hall_resolution = reduction_ratio * ppr_num;
+
+
+/*                Declare Other stuff  here                */
+const int PWM_resolution = 12;
+const int MAX_PWM = pow(2,PWM_resolution)-1;
+const int CPU_Freq = 120;                    //CPU Clock Speed in MHz
 
 //Encoder Pulse timer variables
 volatile unsigned long last_pulse_time = 0;
@@ -82,9 +87,8 @@ volatile int  direction = 1;                //1 is CCW
 
 //Stall Detection variables
 volatile unsigned long stall_timer = 0;
-const unsigned long STALL_THRESHOLD_MS = 1000;  //time before killing power
-const float MIN_SAFE_RPM = 10.0;                //minimum RPM to be considered "moving"
-const int MAX_SPEED = 65535 * 40/100;           //pwm driver is 16-bit
+const unsigned long STALL_THRESHOLD_MS = 1000;    //time before killing power
+const float MIN_SAFE_RPM = 10.0;                  //minimum RPM to be considered "moving"
 
 // Average calculation variables
 #define FILTER_SIZE 10
@@ -96,17 +100,18 @@ float avg_rpm = 0;
 // Misc
 unsigned long prev_loop_time = 0;
 unsigned long prev_noti_time = 0;
-const float period_ms = 50; 
-float target_rpm = 0.0;                         //Set initial RPM here
-float last_target_rpm = 0.0;
-float speed = 0;                                //Set initial speed here
+const float period_ms = 50;
+float target_PWM = 0;
+float current_PWM = 0;                              
 const int MAX_RPM = 1000;                       //Set Maximum RPM here
 
 // PID  Controller Variables (Adjusted for 16-bit PWM)
+float output = 0;
 const float kP = 3;
 const float kD = 0.5;
 float error = 0;
 float last_error = 0;
+
 
 
 /*========================================================*/
@@ -138,11 +143,10 @@ class MyCallbacks: public BLECharacteristicCallbacks {
           );
         }
         else {
-          target_rpm = value.toFloat();
-          //BLE Set Target Speed
-          target_rpm = constrain(target_rpm, -1-MAX_RPM, 1+MAX_RPM);
+          target_PWM = value.toFloat();
+          target_PWM = constrain(target_PWM, -MAX_PWM, MAX_PWM);
           Serial.print("New Target RPM via BLE: ");
-          Serial.println(target_rpm);
+          Serial.println(target_PWM);
         }
       }
     }
@@ -167,17 +171,20 @@ class MyServerCallbacks: public BLEServerCallbacks {
     }
 };
 
+
+
 /*========================================================*/
 /*                  Main setup function                   */
 void setup() {
-
   Serial.begin (115200);
+  setCpuFrequencyMhz(80);
   pin_setup();
   ble_setup();
   mpu_setup();
   mpu_read();
   mpu_calibration();
 }
+
 
 
 /*========================================================*/
@@ -191,28 +198,21 @@ void loop() {
   if (current_time - prev_loop_time >= period_ms) {
     prev_loop_time = current_time;
 
-    // 0.5. Flip detection logic
-    if (last_target_rpm * target_rpm < 0) {
-      analogWrite(EN_PIN, 0);
-      vTaskDelay(pdMS_TO_TICKS(150));
-    }
-    last_target_rpm = target_rpm;
-
-    // 1. Get Encoder data (pulse period)
+    //1. Get Encoder data (pulse period)
     noInterrupts();
     long d_micros = delta_micros;
     int d_dir = direction;
     unsigned long last_p = last_pulse_time;
     interrupts();
 
-    // 2. Calculate Raw RPM
+    //2. Calculate Raw RPM
     if (micros() - last_p > 250000) { // 0.25s timeout for stop
       raw_rpm = 0;
     } else if (d_micros > 0) {
       raw_rpm = (1000000.0 / d_micros / hall_resolution) * 60.0 * d_dir;
     }
 
-    // 3. Averaging out (the RPM)
+    //3. Averaging out (the RPM)
     rpm_buffer[filter_idx] = raw_rpm;
     filter_idx = (filter_idx + 1) % FILTER_SIZE;
     float sum = 0;
@@ -221,22 +221,25 @@ void loop() {
     }
     avg_rpm = sum / FILTER_SIZE;
 
-    // 4. PID Speed calculation
-    error = abs(target_rpm) - abs(avg_rpm);
-    speed += kP * error + kD * (error - last_error) / (period_ms / 1000.0);
-    speed = constrain(speed, 0, 65535*90/100); 
+    //4. PID Speed Control (Open loop)
+    error = target_PWM - current_PWM;
+    output += kP * error + kD * (error - last_error) / (period_ms / 1000.0);
+    output = constrain(output, -65535, 65535); 
     last_error = error;
+    current_PWM = map(output, -65535, 65535, -MAX_PWM, MAX_PWM);
+    int motor_PWM = abs((int)current_PWM);
+    Serial.println(current_PWM);
 
     //4.5. Stall Detection Logic
-    if (abs(target_rpm) > 0 && speed > MAX_SPEED && abs(avg_rpm) < MIN_SAFE_RPM) {
+    if (abs(target_PWM) > MAX_RPM/12 && current_PWM > MAX_RPM/12 && abs(avg_rpm) < MIN_SAFE_RPM) {
       if (stall_timer == 0) {
         //Start stall timer
         stall_timer = current_time;
       } 
       else if (current_time - stall_timer > STALL_THRESHOLD_MS) {
         // STALL TRIGGERED
-        target_rpm = 0; 
-        speed = 0;
+        target_PWM = 0; current_PWM = 0; motor_PWM = 0; error = 0; last_error = 0;
+        analogWrite (EN_PIN, 0);
         stall_timer = 0; // Reset timer
         Serial.println(">>> Stall Detected! Turning off motor.");
       }
@@ -245,23 +248,18 @@ void loop() {
       stall_timer = 0; // Reset timer again if not stall
     }
 
-
     // 5. Speed and Direction change
-    if (target_rpm == 0) {
+    if (current_PWM == 0) {
       analogWrite(EN_PIN, 0);
-      speed = 0;
     } 
-    else if (target_rpm > 0) {
+    else if (current_PWM > 0) {
       digitalWrite(PH_PIN, HIGH);
-      analogWrite(EN_PIN, (int)speed);
     } 
     else {
       digitalWrite(PH_PIN, LOW);
-      analogWrite(EN_PIN, (int)speed);
     }
-    Serial.print(current_time);
-    Serial.print(" ");
-    Serial.println (avg_rpm);
+    analogWrite(EN_PIN, motor_PWM);
+    
 
     // 6. MPU-6050 data
     if (!is_calibrating) {
@@ -270,10 +268,10 @@ void loop() {
   }
 
   // 7. BLE message
-  if (current_time - prev_noti_time >= 800) {
+  if (current_time - prev_noti_time >= 200) {
     prev_noti_time = current_time;
     // 6. Update BLE Notify and Serial
-    String output = String(target_rpm) + "," + 
+    String output = String(target_PWM) + "," + 
                     String(avg_rpm) + "," + 
                     String(ax) + "," + 
                     String(ay) + "," + 
@@ -310,7 +308,7 @@ void pin_setup(){
   pinMode(A, INPUT_PULLUP);
   pinMode(B, INPUT_PULLUP);
 
-  analogWriteResolution(EN_PIN, 16);
+  analogWriteResolution(EN_PIN, PWM_resolution);
   digitalWrite  (PH_PIN, 0);
   analogWrite   (EN_PIN, 0);
   digitalWrite  (SLEEP, 1);
@@ -409,8 +407,8 @@ void mpu_calibration() {
 
   /*  Stop the motor briefly and calibrate the MPU6050*/
   //1. Stop the motor momentarily and reset the offset
-  float backup_target = target_rpm;
-  target_rpm = 0;
+  float backup_target = target_PWM;
+  target_PWM = 0;
   digitalWrite(SLEEP, 0);
   mpu.setXAccelOffset(0); mpu.setYAccelOffset(0); mpu.setZAccelOffset(0);
   mpu.setXGyroOffset(0);  mpu.setYGyroOffset(0);  mpu.setZGyroOffset(0);
@@ -444,7 +442,7 @@ void mpu_calibration() {
   mpu.setXGyroOffset(gx_offset);  mpu.setYGyroOffset(gy_offset);  mpu.setZGyroOffset(gz_offset);
 
   //5. Return to original RPM
-  target_rpm = backup_target;
+  target_PWM = backup_target;
   digitalWrite(SLEEP, 1);
 
   is_calibrating = false;
