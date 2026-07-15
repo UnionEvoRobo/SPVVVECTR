@@ -3,13 +3,13 @@ import qtm_rt
 import math
 
 class QtmTracker():
-    def __init__(self, ip):
+    def __init__(self, ip, loop=None):
         self.ip = ip
         self.connection = None
         self.latest_position = None
         
         # Start the async loop in the background
-        self.loop = asyncio.get_event_loop()
+        self.loop = loop or asyncio.get_event_loop()
         self.loop.create_task(self._run_tracker())
 
     async def _run_tracker(self):

@@ -1,5 +1,5 @@
 from SPVVVECTR_Class import SPVVVECTR
-from spvvvectr_tracker import QtmTracker # Import your refactored tracker
+from spvvvectr_tracker import QtmTracker
 from skopt import Optimizer
 from skopt.space import Integer
 from skopt.sampler import Lhs
@@ -27,44 +27,188 @@ def main():
     threading.Thread(target=run_async_loop, args=(loop,), daemon=True).start()
 
     # --- INITIALIZE TRACKER IN THE ASYNC THREAD ---
-    tracker = QtmTracker("10.76.30.85")
+    tracker = QtmTracker("10.76.30.85", loop=loop)
 
     # Main app window and title
     root = tk.Tk()
     root.title("SPVVVECTR Control & Optimization")
-    root.minsize(800, 400) # Slightly wider to accommodate new buttons
+    root.minsize(900, 700) # Increased size to fit both manual and BO controls
     tk.Label(root, text="Tensegrity Control", font=("Arial", 14, "bold")).grid(
-        row=CURR_ROW, column=0, columnspan=5, pady=5)
+        row = CURR_ROW, column = 0, columnspan = 6, pady=5)
     CURR_ROW += 1
 
     # Global message Setup
     global_message = tk.StringVar()
     global_message.set("Welcome to the Tensegrity Control Panel!")
 
-    # ... [ASSUMING ALL YOUR EXISTING BUTTONS ARE KEPT HERE] ...
-    # (Connect All, Speed Entry, UI Registry, etc.)
+    # =========================================================
+    # --- ORIGINAL MANUAL CONTROL SECTION ---
+    # =========================================================
+
+    async def button1_pressed():
+         await robot.connect_all()
+         global_message.set("Connecting to all struts...")
+    tk.Button(root, text="Connect All", width=cell_width, command=lambda: asyncio.run_coroutine_threadsafe(button1_pressed(), loop)).grid(row=CURR_ROW, column=0)
+
+    async def button2_pressed():
+        await robot.disconnect_all()
+        global_message.set("Disconnecting from all struts...")
+    tk.Button(root, text="Disconnect All", width=cell_width, command=lambda: asyncio.run_coroutine_threadsafe(button2_pressed(), loop)).grid(row=CURR_ROW, column=1)
+
+    async def button3_pressed():
+        await robot.stop_all()
+        global_message.set("Stopping all struts...")
+    tk.Button(root, text="Stop All", width=cell_width, command=lambda: asyncio.run_coroutine_threadsafe(button3_pressed(), loop)).grid(row=CURR_ROW, column=2)
+
+    tk.Label(root, text="Set Global Speed:", width=cell_width).grid(row=CURR_ROW, column=3)
+
+    def Invalid_speed():
+        global_message.set("Invalid input for global speed")
+        
+    async def global_speed_entry(event):
+        global global_speed
+        try:
+            global_speed = int(event.widget.get())
+            if abs(global_speed) <= robot.MAX_SPEED:
+                await robot.set_speed_all(global_speed)
+                global_message.set(f"Global speed set to {global_speed} RPM")
+            else:
+                Invalid_speed()
+        except:
+            Invalid_speed()
+    entry5 = tk.Entry(root, width=cell_width)
+    entry5.grid(row=CURR_ROW, column=4)
+    entry5.bind("<Return>", lambda event: asyncio.run_coroutine_threadsafe(global_speed_entry(event), loop))
+    CURR_ROW += 1
+
+    curr_dir = "Not set"
+    def select_directory():
+        directory = filedialog.askdirectory(title="Select Working Directory")
+        nonlocal curr_dir
+        curr_dir = directory
+        short_dir = "..." + directory[-20:] if len(directory) > 20 else directory
+        work_dir.set(f"Working Directory: {short_dir}")
+        if directory:
+            asyncio.run_coroutine_threadsafe(robot.set_working_directory(directory), loop)
+            
+    tk.Button(root, text="Select Working Directory", width=cell_width, command=select_directory).grid(row=CURR_ROW, column=0)
+    work_dir = tk.StringVar()
+    work_dir.set(f"Working Directory: {curr_dir}")
+    tk.Label(root, textvariable=work_dir).grid(row=CURR_ROW, column=1, columnspan=2)
+
+    recording_status = False
+    recording_message = tk.StringVar()
+    recording_message.set("Recording: OFF")
+    tk.Label(root, textvariable=recording_message).grid(row=CURR_ROW, column=3)
+
+    def toggle_recording():
+        if curr_dir == "Not set":
+            global_message.set("Please select a working directory before recording.")
+        else:
+            nonlocal recording_status
+            recording_status = not recording_status
+            if recording_status:
+                recording_message.set("Recording: ON")
+                asyncio.run_coroutine_threadsafe(robot.start_record(), loop)
+            else:
+                recording_message.set("Recording: OFF")
+                asyncio.run_coroutine_threadsafe(robot.stop_record(), loop)
+        
+    tk.Button(root, text="Toggle Recording", width=cell_width, command=toggle_recording).grid(row=CURR_ROW, column=4)
+    CURR_ROW += 1
+    
+    tk.Label(root, text="Global Message:").grid(row=CURR_ROW, column=0)
+    tk.Label(root, textvariable=global_message, borderwidth=0.5, relief="solid").grid(row=CURR_ROW, column=1, columnspan=4, sticky="ew")
+    CURR_ROW += 1
+
+    ui_registry = {}
+
+    def connect_cmd(name, status_var):
+        async def connect_strut():
+            if status_var.get() == "OFFLINE":
+                try:
+                    await robot.connect_strut(name)
+                except Exception as e:
+                    print(f"Error connecting to {name}: {e}")
+        return lambda: asyncio.run_coroutine_threadsafe(connect_strut(), loop)
+    
+    def disconnect_cmd(name, status_var):
+        async def disconnect_strut():
+            if status_var.get() == "ONLINE":
+                try:
+                    await robot.disconnect_strut(name)
+                except Exception as e:
+                    print(f"Error disconnecting from {name}: {e}")
+        return lambda: asyncio.run_coroutine_threadsafe(disconnect_strut(), loop)
+    
+    def set_speed_cmd(name):
+        async def set_strut_speed(event):
+            try:
+                speed = int(event.widget.get())
+                if abs(speed) <= robot.MAX_SPEED:
+                    await robot.set_speed(name, speed)
+            except ValueError:
+                pass
+        return lambda event: asyncio.run_coroutine_threadsafe(set_strut_speed(event), loop)
+
+    def calibrate_cmd(name):
+        async def calibrate_strut():
+            try:
+                await robot.calibrate(name)
+            except Exception as e:
+                print(f"Error calibrating IMU for {name}: {e}")
+        return lambda: asyncio.run_coroutine_threadsafe(calibrate_strut(), loop)
+
+    # Display struts data
+    for i in range(3):
+        col_offset = i * 2 # Adjusted for better spacing
+
+        name = f"SPVVVECTR{i+1}"
+        tk.Label(root, text=name, font=("Arial", 10, "bold")).grid(row=CURR_ROW, column=col_offset, columnspan=2)
+        
+        status_var = tk.StringVar()
+        status_var.set("OFFLINE")
+        tk.Label(root, textvariable=status_var).grid(row=CURR_ROW+1, column=col_offset, columnspan=2)
+
+        tk.Button(root, text="Connect", width=15, command=connect_cmd(name, status_var)).grid(row=CURR_ROW+2, column=col_offset, columnspan=2)
+        tk.Button(root, text="Disconnect", width=15, command=disconnect_cmd(name, status_var)).grid(row=CURR_ROW+3, column=col_offset, columnspan=2)
+
+        speed_entry = tk.Entry(root, width=15)
+        speed_entry.insert(0, "Set Target RPM")
+        speed_entry.grid(row=CURR_ROW+4, column=col_offset, columnspan=2)
+        speed_entry.bind("<Return>", set_speed_cmd(name))
+
+        rpm_message = tk.StringVar()
+        rpm_message.set("Target RPM: N/A\nActual RPM: N/A")
+        tk.Label(root, textvariable=rpm_message, height=2).grid(row=CURR_ROW+5, column=col_offset, columnspan=2)
+
+        imu_message = tk.StringVar()
+        imu_message.set("Accel: N/A\nGyro: N/A")
+        tk.Label(root, textvariable=imu_message, height=2).grid(row=CURR_ROW+6, column=col_offset, columnspan=2)
+
+        tk.Button(root, text="Calibrate IMU", width=15, command=calibrate_cmd(name)).grid(row=CURR_ROW+7, column=col_offset, columnspan=2)
+
+        ui_registry[name] = {'status': status_var, 'rpm': rpm_message, 'imu': imu_message}
+    
+    CURR_ROW += 8
 
     # =========================================================
     # --- BAYESIAN OPTIMIZATION UI SECTION ---
     # =========================================================
     
-    # Visual Separator
-    tk.Frame(root, height=2, bd=1, relief="sunken").grid(row=CURR_ROW, column=0, columnspan=5, sticky="ew", pady=10)
+    tk.Frame(root, height=2, bd=1, relief="sunken").grid(row=CURR_ROW, column=0, columnspan=6, sticky="ew", pady=15)
     CURR_ROW += 1
 
-    tk.Label(root, text="Bayesian Optimization", font=("Arial", 12, "bold")).grid(
-        row=CURR_ROW, column=0, columnspan=5)
+    tk.Label(root, text="Bayesian Optimization", font=("Arial", 12, "bold")).grid(row=CURR_ROW, column=0, columnspan=6)
     CURR_ROW += 1
 
     bo_status = tk.StringVar(value="BO Status: Idle")
-    tk.Label(root, textvariable=bo_status, fg="blue").grid(row=CURR_ROW, column=0, columnspan=5, sticky="w")
+    tk.Label(root, textvariable=bo_status, fg="blue").grid(row=CURR_ROW, column=0, columnspan=6)
     CURR_ROW += 1
 
-    # Async events for halting the loop
     robot_reset_event = asyncio.Event()
-    trial_decision_future = None # Will hold the Save/Retry decision
+    trial_decision_future = None
 
-    # 1. The Physical Trial Logic
     async def run_physical_trial(rpm_combo, trial_num, total_trials):
         root.after(0, bo_status.set, f"Trial {trial_num}/{total_trials}: PLEASE RESET ROBOT. Click 'Confirm Reset' when ready.")
         await robot_reset_event.wait()
@@ -76,7 +220,6 @@ def main():
         await robot.set_speed("SPVVVECTR2", rpm_combo[1])
         await robot.set_speed("SPVVVECTR3", rpm_combo[2])
         
-        # FIX: Append [0] to extract position from the (pos, rot) tuple
         start_data = tracker.get_current_pos()
         start_pos = start_data[0] if start_data else None
         
@@ -95,22 +238,19 @@ def main():
 
         return displacement
 
-    # 2. The Main BO Loop
     async def run_bo_routine():
         nonlocal trial_decision_future
 
-        # Accounting for noise (Update this value after your baseline variance test)
-        # noise_variance = 150.0 
+        # Set this after your baseline manual testing!
+        noise_variance = 150.0 
 
-        # Define custom gaussian process expecting physical trial noise 
         gp = GaussianProcessRegressor(
-            kernel=Matern(nu=2.5), # Added missing comma here
-            alpha=noise_variance,  # Tells the math not to perfectly trust results 
+            kernel=Matern(nu=2.5), 
+            alpha=noise_variance,  
             normalize_y=True
         )
 
         space = [Integer(-1000, 1000), Integer(-1000, 1000), Integer(-1000, 1000)]
-        # Pass the custom GP as the base_estimator
         opt = Optimizer(space, base_estimator=gp, acq_func="EI")
         
         lhs = Lhs(lhs_type="classic", criterion=None)
@@ -119,31 +259,26 @@ def main():
         total_trials = 50 
         current_trial = 1
 
-        # Phase 1: Priors
         for rpm_combo in initial_points:
-            while True: # Loop allows us to retry the exact same RPM if needed
+            while True: 
                 disp = await run_physical_trial(rpm_combo, current_trial, total_trials)
                 
-                # Decision Gate
                 root.after(0, bo_status.set, f"Trial {current_trial} Disp: {disp:.2f}mm. Save or Retry?")
                 trial_decision_future = loop.create_future()
                 decision = await trial_decision_future 
                 
                 if decision == "save":
                     opt.tell(rpm_combo, -disp) 
-                    break # Exit the while loop, move to next prior
+                    break 
                 elif decision == "retry":
                     root.after(0, global_message.set, "Discarding run. Retrying...")
-            
             current_trial += 1
             
-        # Phase 2: Optimization
         for _ in range(35):
             next_rpm = opt.ask()
             while True: 
                 disp = await run_physical_trial(next_rpm, current_trial, total_trials)
                 
-                # Decision Gate
                 root.after(0, bo_status.set, f"Trial {current_trial} Disp: {disp:.2f}mm. Save or Retry?")
                 trial_decision_future = loop.create_future()
                 decision = await trial_decision_future 
@@ -153,12 +288,10 @@ def main():
                     break 
                 elif decision == "retry":
                     root.after(0, global_message.set, "Discarding run. Retrying...")
-                    
             current_trial += 1
 
         root.after(0, bo_status.set, "BO Complete! Check logs for optimal gaits.")
 
-    # 3. GUI Buttons to control the loop
     def start_bo_cmd():
         asyncio.run_coroutine_threadsafe(run_bo_routine(), loop)
 
@@ -173,14 +306,35 @@ def main():
         if trial_decision_future and not trial_decision_future.done():
             loop.call_soon_threadsafe(trial_decision_future.set_result, "retry")
 
-    # Placing the 4 BO control buttons in a row
+    # BO Control Buttons
     tk.Button(root, text="Start Opt.", width=15, command=start_bo_cmd).grid(row=CURR_ROW, column=1)
     tk.Button(root, text="Confirm Reset", width=15, bg="yellow", command=confirm_reset_cmd).grid(row=CURR_ROW, column=2)
     tk.Button(root, text="Retry (Discard)", width=15, bg="salmon", command=retry_cmd).grid(row=CURR_ROW, column=3)
     tk.Button(root, text="Save & Next", width=15, bg="lightgreen", command=save_cmd).grid(row=CURR_ROW, column=4)
-    CURR_ROW += 1
-
+    
     # =========================================================
+    # --- UI UPDATE LOOP ---
+    # =========================================================
+    
+    async def update_data():
+        for name, elements in ui_registry.items():
+            try:
+                status = await robot.get_status(name)
+                elements['status'].set(status)
+
+                if status == "ONLINE":
+                    data = await robot.get_strut_data(name)
+                    target_rpm, actual_rpm, acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z = data
+                    elements['rpm'].set(f"Target RPM: {target_rpm}\nActual RPM: {actual_rpm}")
+                    elements['imu'].set(f"Accel: ({acc_x:.2f}, {acc_y:.2f}, {acc_z:.2f})\nGyro: ({gyro_x:.2f}, {gyro_y:.2f}, {gyro_z:.2f})")
+                else:
+                    elements['rpm'].set("Target RPM: N/A\nActual RPM: N/A")
+                    elements['imu'].set("Accel: N/A\nGyro: N/A")
+            except Exception as e:
+                print(f"Error updating data for {name}: {e}")
+        root.after(500, lambda: asyncio.run_coroutine_threadsafe(update_data(), loop))
+        
+    asyncio.run_coroutine_threadsafe(update_data(), loop)
 
     root.eval('tk::PlaceWindow . center')
     root.mainloop()
