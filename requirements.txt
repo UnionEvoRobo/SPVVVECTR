@@ -12,13 +12,17 @@ numpy==2.5.0
 packaging==26.2
 pandas==3.0.3
 pillow==12.2.0
+pyaml==26.7.0
 pyobjc-core==12.2.1
 pyobjc-framework-Cocoa==12.2.1
 pyobjc-framework-CoreBluetooth==12.2.1
 pyobjc-framework-libdispatch==12.2.1
 pyparsing==3.3.2
 python-dateutil==2.9.0.post0
+PyYAML==6.0.3
+qtm-rt==3.1.0
 scikit-learn==1.9.0
+scikit-optimize==0.10.2
 scipy==1.18.0
 six==1.17.0
 threadpoolctl==3.6.0
