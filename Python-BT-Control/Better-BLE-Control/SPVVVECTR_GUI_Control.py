@@ -297,6 +297,14 @@ def main():
         
     CURR_ROW += 8
 
+    #Test results and Bayesian optimization display
+    test_message = tk.StringVar()
+    test_message.set("Testing results here...")
+    Test = tk.Label(root, textvariable=test_message, height=2, width=cell_width)
+    Test.grid(row = CURR_ROW, column = 0)
+
+    
+
     #Update data:
     async def update_data():
         for name, elements in ui_registry.items():
