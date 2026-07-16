@@ -46,18 +46,18 @@ def main():
     # =========================================================
 
     async def button1_pressed():
-         await robot.connect_all()
          global_message.set("Connecting to all struts...")
+         await robot.connect_all()
     tk.Button(root, text="Connect All", width=cell_width, command=lambda: asyncio.run_coroutine_threadsafe(button1_pressed(), loop)).grid(row=CURR_ROW, column=0)
 
     async def button2_pressed():
-        await robot.disconnect_all()
         global_message.set("Disconnecting from all struts...")
+        await robot.disconnect_all()
     tk.Button(root, text="Disconnect All", width=cell_width, command=lambda: asyncio.run_coroutine_threadsafe(button2_pressed(), loop)).grid(row=CURR_ROW, column=1)
 
     async def button3_pressed():
-        await robot.stop_all()
         global_message.set("Stopping all struts...")
+        await robot.stop_all()
     tk.Button(root, text="Stop All", width=cell_width, command=lambda: asyncio.run_coroutine_threadsafe(button3_pressed(), loop)).grid(row=CURR_ROW, column=2)
 
     tk.Label(root, text="Set Global Speed:", width=cell_width).grid(row=CURR_ROW, column=3)
