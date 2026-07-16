@@ -10,7 +10,7 @@ async def main():
     robot = SPVVVECTR()
     print("Connecting to struts via Bluetooth...")
     await robot.connect_all()
-    print("✅ Robot connected!")
+    print("Robot connected!")
 
     # 2. Initialize the Qualisys tracker (Make sure IP matches your lab setup)
     tracker = QtmTracker("10.76.30.85")
@@ -21,8 +21,8 @@ async def main():
     print("="*40)
 
     # ---------------------------------------------------------
-    # CHANGE THIS ARRAY FOR EACH OF YOUR 3 TEST GAITS!
-    test_rpm = [1000, 1000, 1000] 
+    # CHANGE THIS ARRAY FOR 3 TEST GAITS!
+    test_rpm = [660, -660, 660] 
     # ---------------------------------------------------------
 
     trial_number = 1
@@ -41,7 +41,7 @@ async def main():
         start_pos = start_data[0] if start_data else None
         
         if not start_pos:
-            print("❌ Error: No tracking data. Are the cameras blocked?")
+            print("Error: No tracking data. Are the cameras blocked?")
             continue
             
         print(f"Tracking started at X: {start_pos.x:.1f}, Y: {start_pos.y:.1f}")
@@ -66,19 +66,23 @@ async def main():
         final_pos = final_data[0] if final_data else None
         
         if not final_pos:
-            print("\n❌ Error: Tracking lost at the end of the trial.")
+            print("\nError: Tracking lost at the end of the trial.")
             continue
 
         # 7. Calculate Displacement
         displacement = math.sqrt((final_pos.x - start_pos.x)**2 + (final_pos.y - start_pos.y)**2)
         
-        print(f"✅ Trial {trial_number} Complete!")
-        print(f"📏 Total Displacement: {displacement:.2f} mm")
+        print(f"Trial {trial_number} Complete!")
+        print(f"Total Displacement: {displacement:.2f} mm")
         print("-" * 40)
         
         trial_number += 1
 
-    print("\n🎉 10 trials complete! Write down your numbers, change 'test_rpm' in the code, and run again for the next gait.")
+    print("\n10 trials complete! Write down your numbers, change 'test_rpm' in the code, and run again for the next gait.")
+    try:
+        robot.stop_all()
+    except Exception as e:
+        pass
 
 if __name__ == "__main__":
     asyncio.run(main())

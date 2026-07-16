@@ -76,7 +76,7 @@ async def main():
     print("="*50)
 
     # --- BO SETUP ---
-    noise_variance = 150.0  # Remember to update this with your baseline test result
+    noise_variance = 3799.32  # Remember to update this with your baseline test result
     
     gp = GaussianProcessRegressor(
         kernel=Matern(nu=2.5), 
