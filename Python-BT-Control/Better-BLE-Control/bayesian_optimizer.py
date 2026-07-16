@@ -8,7 +8,7 @@ from skopt.sampler import Lhs
 from skopt.learning import GaussianProcessRegressor
 from skopt.learning.gaussian_process.kernels import Matern 
 
-async def run_physical_trial(rpm_combo, trial_num, total_trials, robot, tracker):
+async def run_physical_trial(rpm_combo, trial_num, total_trials, robot: SPVVVECTR, tracker: QtmTracker):
     """Handles the 20-second run, tracking, and the Save/Retry decision."""
     while True:
         # 1. The Human Reset Pause

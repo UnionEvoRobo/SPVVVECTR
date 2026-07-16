@@ -276,7 +276,7 @@ def main():
         #MPU data display
         imu_message = tk.StringVar()
         imu_message.set("Accel: N/A\nGyro: N/A")
-        tk.Label(root, textvariable=imu_message, height=2).grid(
+        tk.Label(root, textvariable=imu_message, height=2, width=cell_width).grid(
             row = CURR_ROW+6,
             column = col_offset
         )

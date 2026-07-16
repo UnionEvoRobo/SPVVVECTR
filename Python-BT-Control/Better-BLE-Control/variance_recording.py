@@ -10,7 +10,11 @@ async def main():
     robot = SPVVVECTR()
     print("Connecting to struts via Bluetooth...")
     await robot.connect_all()
-    print("✅ Robot connected!")
+    all_online = all(await robot.get_status(name) == "ONLINE" for name in robot.struts.keys())
+    if all_online:
+        print("✅ Robot connected!")
+    else:
+        print("❌ Failed to connect to all struts.")
 
     # 2. Initialize the Qualisys tracker (Make sure IP matches your lab setup)
     tracker = QtmTracker("10.76.30.85")
@@ -79,6 +83,10 @@ async def main():
         trial_number += 1
 
     print("\n🎉 10 trials complete! Write down your numbers, change 'test_rpm' in the code, and run again for the next gait.")
+    try:
+        robot.stop_all()
+    except Exception as e:
+        pass
 
 if __name__ == "__main__":
     asyncio.run(main())
