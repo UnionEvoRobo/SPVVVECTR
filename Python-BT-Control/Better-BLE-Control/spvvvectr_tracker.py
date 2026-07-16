@@ -51,9 +51,11 @@ class QtmTracker():
 # --- Main ---
 async def main():
     tracker = QtmTracker("10.76.30.85")
+    first_pos = ()
+    last_pos = ()
     
     # Simulate your Bayesian Optimization loop
-    for _ in range(10):
+    for i in range(50):
         raw_data = tracker.get_current_pos()
         #print(f"Algorithm reading current position: {pos}")
 
@@ -67,8 +69,10 @@ async def main():
             current_z = pos_data.z
 
             print(f"X: {current_x:.2f}, Y: {current_y:.2f}, Z: {current_z:.2f}")
+        
+        await asyncio.sleep(0.1)  # Read data ten times a second
+    
 
-        await asyncio.sleep(1)  # Read data once a second
 
 if __name__ == "__main__":
     asyncio.run(main())
