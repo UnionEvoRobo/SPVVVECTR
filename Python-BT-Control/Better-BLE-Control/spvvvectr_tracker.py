@@ -37,15 +37,18 @@ class QtmTracker():
 
     def _on_packet(self, packet):
         """Callback fired by qtm_rt every time a frame arrives."""
-        info, bodies = packet.get_6d()
+        info, bodies = packet.get_6d_euler()    #Change to Euler for readability
         
         # Assuming you just want the first tracked body for now
         for index, position in enumerate(bodies):
             # Update the state continuously in the background
             self.latest_position = position
 
-    def get_current_pos(self):
-        """Non-blocking getter for the main thread to grab the latest data."""
+    def get_current_pos(self): -> tuple
+        """
+        Non-blocking getter for the main thread to grab the latest data.
+        Return: ((x, y, z), (yaw, pitch, roll))
+        """
         return self.latest_position
 
 # --- Main ---
