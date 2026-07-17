@@ -8,7 +8,8 @@ class QtmTracker():
         self.connection = None
         self.latest_position = None
         
-        # Start the async loop in the background
+       
+         # Start the async loop in the background
         self.loop = loop or asyncio.get_event_loop()
         self.loop.create_task(self._run_tracker())
 
@@ -18,7 +19,7 @@ class QtmTracker():
         if self.connection:
             print("Im connected to qtm W!")
             # Stream continuously, pushing data to the callback
-            await self.connection.stream_frames(components=["6d"], on_packet=self._on_packet)
+            await self.connection.stream_frames(components=["6deuler"], on_packet=self._on_packet)
 
     async def _connect_to_qtm(self):
             """Attempts to connect to QTM until successful."""
@@ -37,18 +38,15 @@ class QtmTracker():
 
     def _on_packet(self, packet):
         """Callback fired by qtm_rt every time a frame arrives."""
-        info, bodies = packet.get_6d_euler()    #Change to Euler for readability
+        info, bodies = packet.get_6d_euler()
         
         # Assuming you just want the first tracked body for now
         for index, position in enumerate(bodies):
             # Update the state continuously in the background
             self.latest_position = position
 
-    def get_current_pos(self) -> tuple:
-        """
-        Non-blocking getter for the main thread to grab the latest data.
-        Return: ((x, y, z), (yaw, pitch, roll))
-        """
+    def get_current_pos(self):
+        """Non-blocking getter for the main thread to grab the latest data."""
         return self.latest_position
 
 # --- Main ---
@@ -70,9 +68,9 @@ async def main():
             current_x = pos_data.x
             current_y = pos_data.y
             current_z = pos_data.z
-            current_yaw = rot_data.yaw
 
-            print(f"X: {current_x:.2f}, Y: {current_y:.2f}, Z: {current_z:.2f}, Yaw: {current_yaw:.2f}")
+            print(f"X: {current_x:.2f}, Y: {current_y:.2f}, Z: {current_z:.2f}")
+            print(f"Current Yaw: {rot_data.a1:.2f}")
         
         await asyncio.sleep(0.1)  # Read data ten times a second
     

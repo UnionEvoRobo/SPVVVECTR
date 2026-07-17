@@ -25,7 +25,7 @@ async def main():
 
     # ---------------------------------------------------------
     # CHANGE THIS ARRAY FOR EACH OF YOUR 3 TEST GAITS!
-    test_rpm = [1000, 1000, 1000] 
+    test_rpm = [800, 800, 400] 
     # ---------------------------------------------------------
 
     trial_number = 1
@@ -42,6 +42,7 @@ async def main():
         # 2. Get Starting Position
         start_data = tracker.get_current_pos()
         start_pos = start_data[0] if start_data else None
+        start_yaw = start_data[1].a1 if start_data else None
         
         if not start_pos:
             print("❌ Error: No tracking data. Are the cameras blocked?")
@@ -67,6 +68,7 @@ async def main():
         # 6. Get Final Position
         final_data = tracker.get_current_pos()
         final_pos = final_data[0] if final_data else None
+        final_yaw = final_data[1].a1 if final_data else None
         
         if not final_pos:
             print("\n❌ Error: Tracking lost at the end of the trial.")
@@ -74,9 +76,11 @@ async def main():
 
         # 7. Calculate Displacement
         displacement = math.sqrt((final_pos.x - start_pos.x)**2 + (final_pos.y - start_pos.y)**2)
+        rotation = final_yaw - start_yaw if final_yaw is not None and start_yaw is not None else None
         
         print(f"✅ Trial {trial_number} Complete!")
         print(f"📏 Total Displacement: {displacement:.2f} mm")
+        print(f"🧭 Yaw rotation: {rotation:.2f} degrees")
         print("-" * 40)
         
         trial_number += 1
