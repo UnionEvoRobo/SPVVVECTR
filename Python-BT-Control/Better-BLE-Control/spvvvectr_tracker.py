@@ -44,7 +44,7 @@ class QtmTracker():
             # Update the state continuously in the background
             self.latest_position = position
 
-    def get_current_pos(self): -> tuple
+    def get_current_pos(self) -> tuple:
         """
         Non-blocking getter for the main thread to grab the latest data.
         Return: ((x, y, z), (yaw, pitch, roll))
@@ -70,8 +70,9 @@ async def main():
             current_x = pos_data.x
             current_y = pos_data.y
             current_z = pos_data.z
+            current_yaw = rot_data.yaw
 
-            print(f"X: {current_x:.2f}, Y: {current_y:.2f}, Z: {current_z:.2f}")
+            print(f"X: {current_x:.2f}, Y: {current_y:.2f}, Z: {current_z:.2f}, Yaw: {current_yaw:.2f}")
         
         await asyncio.sleep(0.1)  # Read data ten times a second
     
