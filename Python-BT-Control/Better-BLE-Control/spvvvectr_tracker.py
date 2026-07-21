@@ -56,7 +56,7 @@ async def main():
     last_pos = ()
     
     # Simulate your Bayesian Optimization loop
-    for i in range(50):
+    for i in range(100):
         raw_data = tracker.get_current_pos()
         #print(f"Algorithm reading current position: {pos}")
 

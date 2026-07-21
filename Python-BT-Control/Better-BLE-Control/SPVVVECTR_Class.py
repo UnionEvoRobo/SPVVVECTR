@@ -303,8 +303,8 @@ if __name__ == "__main__":
         robot = SPVVVECTR()
         print ("Robot initialized.")
 
-        work_dir = input("Enter working directory for CSV files: ")
-        await robot.choose_working_directory(work_dir)
+        #work_dir = input("Enter working directory for CSV files: ")
+        #await robot.set_working_directory(work_dir)
 
         while True:
             user_input = input("Choose a number:\n"
@@ -346,4 +346,4 @@ if __name__ == "__main__":
         await robot.disconnect_all()
         print("Test completed.")
 
-    asyncio.run(test_1())
+    asyncio.run(test_2())

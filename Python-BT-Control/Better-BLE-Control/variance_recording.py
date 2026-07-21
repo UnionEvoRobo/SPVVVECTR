@@ -2,6 +2,18 @@ import asyncio
 import math
 from spvvvectr_tracker import QtmTracker
 from SPVVVECTR_Class import SPVVVECTR  # Import your Bluetooth controller
+import csv
+import os
+from datetime import datetime
+
+async def keep_strut_connected(robot):
+    while True:
+        for strut in ["SPVVVECTR1", "SPVVVECTR2", "SPVVVECTR3"]:
+            status = await robot.get_status(strut)
+            if status != "ONLINE":
+                print(f"{strut} is not online! Attempting to reconnect...")
+                await robot.connect(strut)
+        await asyncio.sleep(1)
 
 async def main():
     print("Initializing Robot and Tracker...")
@@ -23,20 +35,36 @@ async def main():
     print("   BASELINE VARIANCE TESTER READY")
     print("="*40)
 
+    # 3. Initialize the CSV file for data collection
+    directory = input("Enter working directory for CSV files: ")
+    if os.path.isdir(directory):
+        os.chdir(directory)
+        print(f"Working directory set to: {directory}")
+    else:
+        print(f"Invalid directory: {directory}")
+    csv_file = f"SPVVVECTR_data_{datetime.now().strftime('%m%d%Y_%H%M%S')}.csv"
+    headers = []
+    headers.extend(["Trial", "M1", "M2", "M3", "Displacement_mm", "Yaw_rotation_deg"])
+    with open(csv_file, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(headers)
+
     # ---------------------------------------------------------
     # CHANGE THIS ARRAY FOR EACH OF YOUR 3 TEST GAITS!
     test_rpm = [1000, 1000, 1000] 
     # ---------------------------------------------------------
-
+    number_of_trials = 50
     trial_number = 1
+    task = asyncio.create_task(keep_strut_connected(robot)) 
 
-    # Loop exactly 10 times for the current gait
-    while trial_number <= 10:
+    # Loop exactly number_of_trials times for the current gait
+    while trial_number <= number_of_trials:
         
+
         # 1. Wait for human input 
         # (We use run_in_executor so the input() prompt doesn't freeze the Qualisys background stream)
         await asyncio.get_event_loop().run_in_executor(
-            None, input, f"\n[Trial {trial_number}/10] Reset robot. Press ENTER to test {test_rpm}..."
+            None, input, f"\n[Trial {trial_number}/{number_of_trials}] Reset robot. Press ENTER to test {test_rpm}..."
         )
         
         # 2. Get Starting Position
@@ -74,7 +102,7 @@ async def main():
             print("\n❌ Error: Tracking lost at the end of the trial.")
             continue
 
-        # 7. Calculate Displacement
+        # 7. Calculate Displacement and Yaw Rotation
         displacement = math.sqrt((final_pos.x - start_pos.x)**2 + (final_pos.y - start_pos.y)**2)
         rotation = final_yaw - start_yaw if final_yaw is not None and start_yaw is not None else None
         
@@ -83,11 +111,21 @@ async def main():
         print(f"🧭 Yaw rotation: {rotation:.2f} degrees")
         print("-" * 40)
         
+        # 8. Record Data to CSV
+        row = [trial_number, test_rpm[0],
+                test_rpm[1], test_rpm[2],
+                  displacement, rotation]
+        with open(csv_file, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(row)
+
         trial_number += 1
 
-    print("\n🎉 10 trials complete! Write down your numbers, change 'test_rpm' in the code, and run again for the next gait.")
+
+    print(f"\n🎉 {number_of_trials} trials complete! Write down your numbers, change 'test_rpm' in the code, and run again for the next gait.")
     try:
-        robot.stop_all()
+        task.cancel()
+        await robot.stop_all()
     except Exception as e:
         pass
     
