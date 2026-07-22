@@ -92,23 +92,24 @@ async def main():
     noise_variance = 3799.32 
 
     # custom gp accounting for varying outputs
-    bounds = torch.tensor([[-1000., -1000., -1000.], [1000., 1000., 1000.]])
-    single_model = SingleTaskGP(likelihood=)
+    # bounds = torch.tensor([[-1000., -1000., -1000.], [1000., 1000., 1000.]])
+    # single_model = SingleTaskGP(likelihood=)
     
     # generate priors
     initial_points_x = generate_random_priors(15)
     # inital_points_x = generate_lhs_priors()
-    print(initial_points_x)
 
 
-    total_trials = 50
+    total_prior_trials = 15
     current_trial = 1 
 
+    print(f"Prior inputs are: {initial_points_x}")
     # (1) priors - 15 trials 
     initial_points_y = []
     for rpm_combo in initial_points_x:
-        initial_points_y.append(await run_physical_trials(rpm_combo, current_trial, total_trials, SPVVVECTR, QtmTracker))
+        initial_points_y.append(await run_physical_trials(rpm_combo, current_trial, total_prior_trials, SPVVVECTR, QtmTracker))
         current_trial += 1
+    
     
     # (2) optimization - 35 trials 
     #for i in range(35):
