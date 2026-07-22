@@ -23,7 +23,7 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot, tracker
         print(f"Starting Trial {trial_num}...")
 
         # get starting position 
-        start_data = QtmTracker.get_current_pos() 
+        start_data = tracker.get_current_pos() 
         
         if start_data:
             start_pos = start_data[0]
@@ -31,9 +31,11 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot, tracker
             print("NO INITIAL STARTING POSITION FOUND (QTM ISSUE??)")
 
         # start motors on spvvvectr
-        await robot.set_speed("SPVVVVECTR1", int(rpm_combo[0]))
-        await robot.set_speed("SPVVVVECTR2", int(rpm_combo[1]))
-        await robot.set_speed("SPVVVVECTR3", int(rpm_combo[2]))
+        print(f"rpm combo is: {rpm_combo}")
+        print(f"rpm_combo[0] is: {rpm_combo[0]}")
+        await robot.set_speed(name="SPVVVVECTR1", value=int(rpm_combo[0]))
+        await robot.set_speed(name="SPVVVVECTR2", value=int(rpm_combo[1]))
+        await robot.set_speed(name="SPVVVVECTR3", value=int(rpm_combo[2]))
 
         # run for 20 seconds 
         for i in range(20):
@@ -45,7 +47,7 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot, tracker
         print("Motors Stopped")
 
         # get final position & calculate displacement 
-        final_data = QtmTracker.get_current_pos()
+        final_data = tracker.get_current_pos()
         if final_data:
             final_pos = final_data[0]
         else:
@@ -116,7 +118,7 @@ async def main():
     print(f"Prior inputs are: {initial_points_x}")
     initial_points_y = []
     for rpm_combo in initial_points_x:
-        displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, SPVVVECTR, QtmTracker)
+        displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
         opt.tell(rpm_combo, -displacement) # negative for max
         current_trial += 1
     
@@ -125,7 +127,7 @@ async def main():
     # (2) optimization - 35 trials 
     for i in range(35):
         next_rpm = opt.ask()
-        displacement = await run_physical_trials(next_rpm, current_trial, total_trials, SPVVVECTR, QtmTracker)
+        displacement = await run_physical_trials(next_rpm, current_trial, total_trials, robot, tracker)
         opt.tell(next_rpm, -displacement)
         current_trial += 1
         
