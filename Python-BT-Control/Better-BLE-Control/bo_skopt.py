@@ -37,7 +37,7 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot, tracker
 
         # run for 20 seconds 
         for i in range(20):
-            print(f"Running... {20-i} seconds left", end="/r")
+            print(f"Running... {20-i} seconds left", end="\r")
             await asyncio.sleep(1)
 
         # stop motors 
