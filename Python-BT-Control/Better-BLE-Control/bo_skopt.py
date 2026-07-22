@@ -30,12 +30,10 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot, tracker
         else:
             print("NO INITIAL STARTING POSITION FOUND (QTM ISSUE??)")
 
-        # start motors on spvvvectr
-        print(f"rpm combo is: {rpm_combo}")
-        print(f"rpm_combo[0] is: {rpm_combo[0]}")
-        await robot.set_speed(name="SPVVVVECTR1", value=int(rpm_combo[0]))
-        await robot.set_speed(name="SPVVVVECTR2", value=int(rpm_combo[1]))
-        await robot.set_speed(name="SPVVVVECTR3", value=int(rpm_combo[2]))
+        # start motors on spvvvectrxs
+        await robot.set_speed(name="SPVVVECTR1", value=int(rpm_combo[0]))
+        await robot.set_speed(name="SPVVVECTR2", value=int(rpm_combo[1]))
+        await robot.set_speed(name="SPVVVECTR3", value=int(rpm_combo[2]))
 
         # run for 20 seconds 
         for i in range(20):
@@ -119,7 +117,7 @@ async def main():
     initial_points_y = []
     for rpm_combo in initial_points_x:
         displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
-        opt.tell(rpm_combo, -displacement) # negative for max
+        opt.tell(rpm_combo.tolist(), -displacement) # negative for max
         current_trial += 1
     
     print("Done with priors...")
