@@ -5,8 +5,11 @@ import asyncio
 import math
 from spvvvectr_tracker import QtmTracker
 from SPVVVECTR_Class import SPVVVECTR
-from botorch.models import SingleTaskGP, ModelListGP
-from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikelihood
+from skopt import Optimizer
+from skopt.space import Integer
+from skopt.sampler import Lhs
+from skopt.learning import GaussianProcessRegressor
+from skopt.learning.gaussian_process.kernels import Matern 
 
 
 async def run_physical_trials(rpm_combo, trial_num, total_trials, robot, tracker):
@@ -76,8 +79,11 @@ def generate_random_priors(num_trials):
     return train_x
 
 
-def generate_lhs_priors():
+def generate_lhs_priors(opt):
     """Testing prior generation with latin hypercube sampling"""
+    lhs = Lhs(lhs_type="classic", criterion=None)
+    initial_points = lhs.generate(opt.space.dimensions, 15)
+    return initial_points
 
 async def main():
     print("Starting robot & tracker...")
@@ -91,34 +97,50 @@ async def main():
     # account noise from variance testing 
     noise_variance = 3799.32 
 
-    # custom gp accounting for varying outputs
-    # bounds = torch.tensor([[-1000., -1000., -1000.], [1000., 1000., 1000.]])
-    # single_model = SingleTaskGP(likelihood=)
+    gp = GaussianProcessRegressor(
+        kernel=Matern(nu=2.5), # the smoothness of curve
+        alpha=noise_variance,
+        normalize_y=True
+    )
+
+    bounds = [Integer(-1000, 1000), Integer(-1000, 1000), Integer(-1000, 1000)]
+    opt = Optimizer(bounds, base_estimator=gp, acq_func="EI")
+
     
     # generate priors
     initial_points_x = generate_random_priors(15)
-    # inital_points_x = generate_lhs_priors()
+    #inital_points_x = generate_lhs_priors(opt)
 
-
-    total_prior_trials = 15
+    total_trials = 50
     current_trial = 1 
 
-    print(f"Prior inputs are: {initial_points_x}")
     # (1) priors - 15 trials 
+
+    print(f"Prior inputs are: {initial_points_x}")
     initial_points_y = []
     for rpm_combo in initial_points_x:
-        initial_points_y.append(await run_physical_trials(rpm_combo, current_trial, total_prior_trials, SPVVVECTR, QtmTracker))
+        displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, SPVVVECTR, QtmTracker)
+        opt.tell(rpm_combo, -displacement) # negative for max
         current_trial += 1
     
+    print("Done with priors...")
     
     # (2) optimization - 35 trials 
-    #for i in range(35):
+    for i in range(35):
+        next_rpm = opt.ask()
+        displacement = await run_physical_trials(next_rpm, current_trial, total_trials, SPVVVECTR, QtmTracker)
+        opt.tell(next_rpm, -displacement)
+        current_trial += 1
         
 
     # results 
+    print("Bayesian Optimization Complete!")
+    best_index = opt.yi.index(min(opt.yi))
+    best_rpm = opt.Xi[best_index]
+    best_displacement = -opt.yi[best_index]
 
-
-
+    print(f"Best Gait is: {best_rpm}")
+    print(f"Results in max displacement of: {best_displacement:.2f} mm")
     
 if __name__ == "__main__":
     asyncio.run(main())
