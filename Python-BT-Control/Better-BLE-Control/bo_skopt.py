@@ -1,5 +1,3 @@
-import os
-import torch 
 import numpy as np
 import asyncio
 import math
@@ -75,9 +73,8 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot, tracker
 
 def generate_random_priors(num_trials):
     """Testing random prior sampling for BO"""
-    train_x = torch.randint(-1000, 1000, (num_trials, 3))
+    train_x = np.random.randint(-1000, 1000, size=(num_trials, 3))
     return train_x
-
 
 def generate_lhs_priors(opt):
     """Testing prior generation with latin hypercube sampling"""
