@@ -51,7 +51,7 @@ async def main():
 
     # ---------------------------------------------------------
     # CHANGE THIS ARRAY FOR EACH OF YOUR 3 TEST GAITS!
-    test_rpm = [1000, 1000, 1000] 
+    test_rpm = [-800, 700, 900] 
     # ---------------------------------------------------------
     number_of_trials = 50
     trial_number = 1
@@ -115,6 +115,12 @@ async def main():
         row = [trial_number, test_rpm[0],
                 test_rpm[1], test_rpm[2],
                   displacement, rotation]
+        for i in range (1, 4):
+            strut = f"SPVVVECTR{i}"
+            status = await robot.get_status(strut)
+            if status != "ONLINE":
+                row[i] = 0
+                print (f"ERROR, {strut} IS NOT ONLINE.")
         with open(csv_file, mode='a', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(row)
