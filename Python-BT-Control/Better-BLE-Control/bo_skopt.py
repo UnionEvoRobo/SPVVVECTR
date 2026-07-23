@@ -35,6 +35,12 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot, tracker
         await robot.set_speed(name="SPVVVECTR2", value=int(rpm_combo[1]))
         await robot.set_speed(name="SPVVVECTR3", value=int(rpm_combo[2]))
 
+        print("getting status of struts...")
+        print(f"strut 1 is: {await robot.get_status("SPVVVECTR1")}")
+        print(f"strut 2 is: {await robot.get_status("SPVVVECTR2")}")
+        print(f"strut 3 is: {await robot.get_status("SPVVVECTR3")}")
+
+
         # run for 20 seconds 
         for i in range(20):
             print(f"Running... {20-i} seconds left", end="\r")
