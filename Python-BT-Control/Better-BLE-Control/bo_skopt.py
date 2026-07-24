@@ -31,17 +31,19 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
             print("NO INITIAL STARTING POSITION FOUND (QTM ISSUE??)")
 
         # start motors on spvvvectrxs
-        print("getting status of struts...")
-        for i in range (1,4):
-            strut = f"SPVVVECTR{i}"
-            status = await robot.get_status(strut)
-            if status == "OFFLINE":
-                try:
-                    await robot.connect_strut(strut)
-                except Exception as E:
-                    pass
-            status = await robot.get_status(strut)
-            print (f"{strut} is {status}")
+        # print("getting status of struts...")
+        # for i in range (1,4):
+        #     strut = f"SPVVVECTR{i}"
+        #     status = await robot.get_status(strut)
+        #     if status == "OFFLINE":
+        #         try:
+        #             await robot.connect_strut(strut)
+        #         except Exception as E:
+        #             pass
+        #     status = await robot.get_status(strut)
+        #     print (f"{strut} is {status}")
+
+        await print_status(robot)
 
         await robot.set_speed(name="SPVVVECTR1", value=int(rpm_combo[0]))
         await robot.set_speed(name="SPVVVECTR2", value=int(rpm_combo[1]))
@@ -77,6 +79,8 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
 
         print(f"Displacement: {displacement:.2f} mm")
 
+        await print_status(robot)
+
         decision = await asyncio.get_event_loop().run_in_executor(
             None, input, "Press 's' to SAVE and CONTINUE; Press 'r' to RETRY this trial: "
         )
@@ -88,6 +92,20 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
             print("Discarding and trying again.")
 
 
+
+async def print_status(robot):
+    # start motors on spvvvectrxs
+    print("getting status of struts...")
+    for i in range (1,4):
+        strut = f"SPVVVECTR{i}"
+        status = await robot.get_status(strut)
+        if status == "OFFLINE":
+            try:
+                await robot.connect_strut(strut)
+            except Exception as E:
+                pass
+        status = await robot.get_status(strut)
+        print (f"{strut} is {status}")
 
 def generate_random_priors(num_trials):
     """Testing random prior sampling for BO"""
