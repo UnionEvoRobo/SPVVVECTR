@@ -115,7 +115,7 @@ async def main():
         writer = csv.writer(file)
         writer.writerow(["Trial_Number", "Phase", "RPM_1", "RPM_2", "RPM_3", "Displacement_mm"])
     
-    print(f"💾 Saving data live to: {csv_filename}")
+    print(f"Saving data to: {csv_filename}")
     # -----------------
 
     # connect hardware 
