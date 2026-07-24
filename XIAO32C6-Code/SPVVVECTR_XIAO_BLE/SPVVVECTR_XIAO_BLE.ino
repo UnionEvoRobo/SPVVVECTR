@@ -54,16 +54,14 @@ bool sprint = true;
 
 
 /*            Declare the GPIO pins here              */
-const int EN_PIN    = 1;                  
-const int PH_PIN    = 0;                  
-const int SLEEP     = 2;                 
-const int A         = 4;
-const int B         = 3; 
-const int MPU_SDA   = 6;
-const int MPU_SCL   = 7;
-
-const int PWM_BITS = 12;
-const int MAX_PWM = pow(2,12)-1;
+const int Batt_V    = D0;
+const int EN_PIN    = D10;                  
+const int PH_PIN    = D9;                  
+const int SLEEP     = D8;                 
+const int A         = D3;
+const int B         = D2; 
+const int MPU_SDA   = D4;
+const int MPU_SCL   = D5;
 
 
 /*                Declare MPU6050 here                */
@@ -81,6 +79,11 @@ const float reduction_ratio = 10.0;         //Since the motor is 1:10 reduction
 const int   ppr_num = 12;                    //Inside encoder datasheet
 const float hall_resolution = reduction_ratio * ppr_num; 
 
+/*                Declare Other stuff  here                */
+const int PWM_resolution = 12;
+const int MAX_PWM = pow(2,PWM_resolution)-1;
+const int CPU_Freq = 120;                    //CPU Clock Speed in MHz
+
 //Encoder Pulse timer variables
 volatile unsigned long last_pulse_time = 0;
 volatile long delta_micros = 0;
@@ -89,7 +92,8 @@ volatile int  direction = 1;                //1 is CCW
 //Stall Detection variables
 volatile unsigned long stall_timer = 0;
 const unsigned long STALL_THRESHOLD_MS = 1000;  //time before killing power
-const float MIN_SAFE_RPM = 20.0;                //minimum RPM to be considered "moving"
+const float MIN_SAFE_RPM = 20.0;                //minimum R
+PM to be considered "moving"
 const int MAX_SPEED = MAX_PWM * 20/100;           //pwm driver is 16-bit
 
 // Average calculation variables
@@ -108,10 +112,11 @@ float speed = 0;                                //Set initial speed here
 const int MAX_RPM = 1000;                       //Set Maximum RPM here
 
 // PID  Controller Variables (Adjusted for 16-bit PWM)
-const float kP = 2;
-const float kD = 0.5;
-float error = 0;
-float last_error = 0;
+double Kp = 17;
+double Ki = 43;
+double error = 0;
+double integralSum = 0;
+double max_integral = MAX_PWM/Ki;
 
 
 /*========================================================*/
@@ -177,12 +182,12 @@ class MyServerCallbacks: public BLEServerCallbacks {
 void setup() {
 
   Serial.begin(115200);
-  Serial.println("Hello.");
+  setCpuFrequencyMhz(80);
   pin_setup();
   ble_setup();
-  mpu_setup();
-  mpu_read();
-  mpu_calibration();
+  //mpu_setup();
+  //mpu_read();
+  //mpu_calibration();
 }
 
 
@@ -221,9 +226,17 @@ void loop() {
     avg_rpm = sum / FILTER_SIZE;
 
     // 4. PID Speed calculation
-    error = abs(target_rpm) - abs(avg_rpm);
-    speed += kP * error + kD * (error - last_error) / (period_ms / 1000.0);
-    last_error = error;
+    error = target_rpm - avg_rpm;
+    integralSum += error * period_ms/1000;
+    if (integralSum > max_integral) {integralSum = max_integral;}
+    else if (integralSum < -max_integral) {integralSum = -max_integral;}
+
+    double pTerm = Kp * error;
+    double iTerm = Ki * integralSum;
+    double output = pTerm + iTerm;
+    
+    if (output > MAX_PWM) {output = MAX_PWM;}
+    else if (output < -MAX_PWM) {output = -MAX_PWM;}
 
     if (abs(target_rpm) > 0 && speed < 1000) {
       speed = 1000; // Minimum baseline 14-bit PWM to break gearbox friction
@@ -251,28 +264,17 @@ void loop() {
     // 5. Speed and Direction change
     if (target_rpm == 0) {
       analogWrite(EN_PIN, 0);
-      speed = 0;
-    } 
-    else if (target_rpm > 0) {
-      digitalWrite(PH_PIN, HIGH);
-      analogWrite(EN_PIN, (int)speed);
     } 
     else {
-      digitalWrite(PH_PIN, LOW);
-      analogWrite(EN_PIN, (int)speed);
+      if (output > 0) {digitalWrite(PH_PIN, HIGH);}
+      else {digitalWrite(PH_PIN, LOW);}
+      analogWrite(EN_PIN, abs(output));
     }
-    Serial.print(current_time);
-    Serial.print("\t");
-    Serial.print(target_rpm);
-    Serial.print("\t");
-    Serial.print(avg_rpm);
-    Serial.print("\t");
-    Serial.println (speed);
 
     // 6. MPU-6050 data
-    if (!is_calibrating) {
+    /*if (!is_calibrating) {
       mpu_read();
-    }
+    }*/
   }
 
   // 7. BLE message
@@ -280,13 +282,13 @@ void loop() {
     prev_noti_time = current_time;
     // 6. Update BLE Notify and Serial
     String output = String(target_rpm) + "," + 
-                    String(avg_rpm) + "," + 
+                    String(avg_rpm) /*+ "," + 
                     String(ax) + "," + 
                     String(ay) + "," + 
                     String(az) + "," + 
                     String(gx) + "," + 
                     String(gy) + "," + 
-                    String(gz);
+                    String(gz)*/;
     pGlobalCharacteristic->setValue(output.c_str());
     pGlobalCharacteristic->notify();
   }
@@ -316,7 +318,7 @@ void pin_setup(){
   pinMode(A, INPUT_PULLUP);
   pinMode(B, INPUT_PULLUP);
 
-  analogWriteResolution(EN_PIN, PWM_BITS);
+  analogWriteResolution(EN_PIN, PWM_resolution);
   digitalWrite  (PH_PIN, 0);
   analogWrite   (EN_PIN, 0);
   digitalWrite  (SLEEP, 1);

@@ -41,9 +41,9 @@ String name = "SPVVVECTR3";
 
 
 /*      BLE variables: Change name and UUID here      */
-String name = "SPVVVECTR3";
-#define SERVICE_UUID        "e132a2ee-a68a-4b4b-98fa-29ef8bbc0be2"
-#define CHARACTERISTIC_UUID "ccba8d13-8743-45f7-9fd9-69a20a9acddc"
+String name = "SPVVVECTR1";
+#define SERVICE_UUID        "afcdeba4-f8a9-4ca1-baa5-021afe634998"
+#define CHARACTERISTIC_UUID "83147421-2684-43ec-af39-58533d866c8e"
 BLECharacteristic *pGlobalCharacteristic; 
 bool sprint = true;
 
@@ -101,14 +101,14 @@ float avg_rpm = 0;
 // Misc
 unsigned long prev_loop_time = 0;
 unsigned long prev_noti_time = 0;
-const float period_ms = 25; 
+const float period_ms = 50; 
 float target_rpm = 0.0;                         //Set initial RPM here
 const int MAX_RPM = 1000;                       //Set Maximum RPM here
 unsigned long start_time;
 
 // PID  Controller Variables (Adjusted for 16-bit PWM)
 double Kp = 3.0;
-double Ki = 2.0;
+double Ki = 11.0;
 double error = 0;
 double integralSum = 0;
 double max_integral = MAX_PWM/Ki;
