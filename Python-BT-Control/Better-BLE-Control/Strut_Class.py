@@ -221,11 +221,18 @@ if __name__ == "__main__":
         strut = Strut("test_board", 
                     {"address": "70:AF:09:3B:B3:52", 
                     "service": "900ec402-1a33-4c94-a3d7-076951f68065", 
+<<<<<<< Updated upstream
                     "char": "cf9ecefe-a9f3-4087-af6a-cf7a6f917750"})
         '''strut = Strut("SPVVVECTR1", 
                       {"address": "8C:94:DF:2B:28:E6", 
                         "service": "afcdeba4-f8a9-4ca1-baa5-021afe634998", 
                         "char": "83147421-2684-43ec-af39-58533d866c8e"})'''
+=======
+                    "char": "cf9ecefe-a9f3-4087-af6a-cf7a6f917750"})'''
+        strut = Strut("SPVVVECTR3", {"address": "8C:94:DF:2B:28:F2", 
+                           "service": "e132a2ee-a68a-4b4b-98fa-29ef8bbc0be2", 
+                           "char": "ccba8d13-8743-45f7-9fd9-69a20a9acddc"})
+>>>>>>> Stashed changes
         
         print ("Strut intialized.")
 
