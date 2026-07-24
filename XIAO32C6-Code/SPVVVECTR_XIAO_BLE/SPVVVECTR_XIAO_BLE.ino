@@ -92,8 +92,7 @@ volatile int  direction = 1;                //1 is CCW
 //Stall Detection variables
 volatile unsigned long stall_timer = 0;
 const unsigned long STALL_THRESHOLD_MS = 1000;  //time before killing power
-const float MIN_SAFE_RPM = 20.0;                //minimum R
-PM to be considered "moving"
+const float MIN_SAFE_RPM = 20.0;                //minimum RPM to be considered "moving"
 const int MAX_SPEED = MAX_PWM * 20/100;           //pwm driver is 16-bit
 
 // Average calculation variables
@@ -112,8 +111,8 @@ float speed = 0;                                //Set initial speed here
 const int MAX_RPM = 1000;                       //Set Maximum RPM here
 
 // PID  Controller Variables (Adjusted for 16-bit PWM)
-double Kp = 17;
-double Ki = 43;
+double Kp = 3;
+double Ki = 10.5;
 double error = 0;
 double integralSum = 0;
 double max_integral = MAX_PWM/Ki;
@@ -238,13 +237,8 @@ void loop() {
     if (output > MAX_PWM) {output = MAX_PWM;}
     else if (output < -MAX_PWM) {output = -MAX_PWM;}
 
-    if (abs(target_rpm) > 0 && speed < 1000) {
-      speed = 1000; // Minimum baseline 14-bit PWM to break gearbox friction
-    }
-    speed = constrain(speed, 0, MAX_PWM*80/100); 
-
     //4.5 Stall Detection Logic
-    if (abs(target_rpm) > 0 && speed > MAX_SPEED && abs(avg_rpm) < MIN_SAFE_RPM) {
+    if (abs(target_rpm) > 0 && abs(output) > MAX_SPEED && abs(avg_rpm) < MIN_SAFE_RPM) {
       if (stall_timer == 0) {
         //Start stall timer
         stall_timer = current_time;
