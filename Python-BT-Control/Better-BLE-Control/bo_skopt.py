@@ -30,30 +30,10 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
         else:
             print("NO INITIAL STARTING POSITION FOUND (QTM ISSUE??)")
 
-        # start motors on spvvvectrxs
-        # print("getting status of struts...")
-        # for i in range (1,4):
-        #     strut = f"SPVVVECTR{i}"
-        #     status = await robot.get_status(strut)
-        #     if status == "OFFLINE":
-        #         try:
-        #             await robot.connect_strut(strut)
-        #         except Exception as E:
-        #             pass
-        #     status = await robot.get_status(strut)
-        #     print (f"{strut} is {status}")
-
         await print_status(robot)
-
         await robot.set_speed(name="SPVVVECTR1", value=int(rpm_combo[0]))
         await robot.set_speed(name="SPVVVECTR2", value=int(rpm_combo[1]))
         await robot.set_speed(name="SPVVVECTR3", value=int(rpm_combo[2]))
-
-        # print("getting status of struts...")
-        # print(f"strut 1 is: {await robot.get_status("SPVVVECTR1")}")
-        # print(f"strut 2 is: {await robot.get_status("SPVVVECTR2")}")
-        # print(f"strut 3 is: {await robot.get_status("SPVVVECTR3")}")
-
 
         # run for 20 seconds 
         for i in range(20):
@@ -73,6 +53,11 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
 
         if start_pos and final_pos:
             displacement = math.sqrt((final_pos.x - start_pos.x)**2 + (final_pos.y - start_pos.y)**2)
+
+            if math.isnan(displacement):
+                print("Displacement was nan for some reason, maybe qualisys. retry!")
+                displacement = 0.0
+
         else:
             displacement = 0.0
             print("Tracking issue. Displacement not found, set to 0.0 by default")
