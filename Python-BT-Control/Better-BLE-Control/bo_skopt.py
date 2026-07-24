@@ -1,20 +1,21 @@
 import numpy as np
 import asyncio
 import math
+import csv
+from datetime import datetime
 from spvvvectr_tracker import QtmTracker
 from SPVVVECTR_Class import SPVVVECTR
 from skopt import Optimizer
+from skopt import dump
 from skopt.space import Integer
 from skopt.sampler import Lhs
 from skopt.learning import GaussianProcessRegressor
 from skopt.learning.gaussian_process.kernels import Matern 
 
-
 async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECTR, tracker):
     """Handles 20 second trials, tracking, and user choice to save/retry trial"""
 
     while True:
-
         # pause to reset robot position before next trial
         await asyncio.get_event_loop().run_in_executor(
             None, input, f"\nTrial {trial_num}/{total_trials} | reset robot position, press enter to run rpm combo: {rpm_combo}..."
@@ -42,7 +43,7 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
 
         # stop motors 
         await robot.stop_all()
-        print("Motors Stopped")
+        print("Motors Stopped                        ")
 
         # get final position & calculate displacement 
         final_data = tracker.get_current_pos()
@@ -76,8 +77,6 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
         else:
             print("Discarding and trying again.")
 
-
-
 async def print_status(robot):
     # start motors on spvvvectrxs
     print("getting status of struts...")
@@ -106,6 +105,19 @@ def generate_lhs_priors(opt):
 async def main():
     print("Starting robot & tracker...")
 
+    # --- CSV SETUP ---
+    # Create a unique filename based on the current date and time
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    csv_filename = f"bo_results_{timestamp}.csv"
+    
+    # Initialize the file and write the header row
+    with open(csv_filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["Trial_Number", "Phase", "RPM_1", "RPM_2", "RPM_3", "Displacement_mm"])
+    
+    print(f"💾 Saving data live to: {csv_filename}")
+    # -----------------
+
     # connect hardware 
     robot = SPVVVECTR()
     await robot.connect_all()
@@ -123,7 +135,6 @@ async def main():
 
     bounds = [Integer(-1000, 1000), Integer(-1000, 1000), Integer(-1000, 1000)]
     opt = Optimizer(bounds, base_estimator=gp, acq_func="EI")
-
     
     # generate priors
     initial_points_x = generate_random_priors(15)
@@ -133,11 +144,16 @@ async def main():
     current_trial = 1 
 
     # (1) priors - 15 trials 
-
     print(f"Prior inputs are: {initial_points_x}")
     for rpm_combo in initial_points_x:
         displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
         opt.tell(rpm_combo.tolist(), -displacement) # negative for max
+        
+        # --- SAVE TO CSV ---
+        with open(csv_filename, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([current_trial, "Prior", int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2]), round(displacement, 2)])
+        
         current_trial += 1
     
     print("Done with priors...")
@@ -147,19 +163,45 @@ async def main():
         next_rpm = opt.ask()
         displacement = await run_physical_trials(next_rpm, current_trial, total_trials, robot, tracker)
         opt.tell(next_rpm, -displacement)
+        
+        # --- SAVE TO CSV ---
+        with open(csv_filename, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([current_trial, "Optimization", int(next_rpm[0]), int(next_rpm[1]), int(next_rpm[2]), round(displacement, 2)])
+            
         current_trial += 1
         
-
     # results 
     print("Bayesian Optimization Complete!")
     best_index = opt.yi.index(min(opt.yi))
     best_rpm = opt.Xi[best_index]
     best_displacement = -opt.yi[best_index]
+    
+    # Theoretical results from the model
+    res = opt.get_result()
+    theoretical_rpm = res.x
+    theoretical_disp = -res.fun
 
-    print(f"Best Gait is: {best_rpm}")
+    print(f"Best Observed Gait is: {best_rpm}")
     print(f"Results in max displacement of: {best_displacement:.2f} mm")
+    print(f"Theoretical Predicted Gait is: {theoretical_rpm}")
+    print(f"Theoretical Max Displacement: {theoretical_disp:.2f} mm")
+
+    # --- SAVE FINAL RESULTS TO CSV ---
+    with open(csv_filename, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow([]) # Blank row for readability
+        writer.writerow(["--- FINAL BO RESULTS ---"])
+        writer.writerow(["Category", "RPM_1", "RPM_2", "RPM_3", "Displacement_mm"])
+        writer.writerow(["Best Observed", int(best_rpm[0]), int(best_rpm[1]), int(best_rpm[2]), round(best_displacement, 2)])
+        writer.writerow(["Theoretical Predicted", int(theoretical_rpm[0]), int(theoretical_rpm[1]), int(theoretical_rpm[2]), round(theoretical_disp, 2)])
+    
+    print(f"All results fully saved to {csv_filename}")
+
+    # saving the ml model 
+    pkl_filename = f"bo_model_{timestamp}.pkl"
+    dump(res, pkl_filename)
+    print(f"Gaussian Process model now dumped into {pkl_filename}")
     
 if __name__ == "__main__":
     asyncio.run(main())
-
-
