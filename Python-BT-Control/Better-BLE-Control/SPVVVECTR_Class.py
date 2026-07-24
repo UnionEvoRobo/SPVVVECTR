@@ -146,8 +146,10 @@ class SPVVVECTR():
         @return: "ONLINE" if connected, "OFFLINE" otherwise.
         '''
         if name in self.struts:
+            self.struts_status[name] = self.struts[name].get_status()
             return self.struts_status[name]
         else:
+            print ("Invalid name!")
             return None
     
     async def get_all_status(self):
@@ -155,6 +157,8 @@ class SPVVVECTR():
         Get the current status of all struts.\n
         @return: A copy of the dictionary containing the status of all struts.
         '''
+        for name in self.config:
+            await self.get_status(name)
         return copy.copy(self.struts_status)
 
 
