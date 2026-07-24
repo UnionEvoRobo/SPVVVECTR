@@ -10,7 +10,7 @@ from skopt.learning import GaussianProcessRegressor
 from skopt.learning.gaussian_process.kernels import Matern 
 
 
-async def run_physical_trials(rpm_combo, trial_num, total_trials, robot, tracker):
+async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECTR, tracker):
     """Handles 20 second trials, tracking, and user choice to save/retry trial"""
 
     while True:
@@ -31,14 +31,26 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot, tracker
             print("NO INITIAL STARTING POSITION FOUND (QTM ISSUE??)")
 
         # start motors on spvvvectrxs
+        print("getting status of struts...")
+        for i in range (1,4):
+            strut = f"SPVVVECTR{i}"
+            status = await robot.get_status(strut)
+            if status == "OFFLINE":
+                try:
+                    await robot.connect_strut(strut)
+                except Exception as E:
+                    pass
+            status = await robot.get_status(strut)
+            print (f"{strut} is {status}")
+
         await robot.set_speed(name="SPVVVECTR1", value=int(rpm_combo[0]))
         await robot.set_speed(name="SPVVVECTR2", value=int(rpm_combo[1]))
         await robot.set_speed(name="SPVVVECTR3", value=int(rpm_combo[2]))
 
-        print("getting status of struts...")
-        print(f"strut 1 is: {await robot.get_status("SPVVVECTR1")}")
-        print(f"strut 2 is: {await robot.get_status("SPVVVECTR2")}")
-        print(f"strut 3 is: {await robot.get_status("SPVVVECTR3")}")
+        # print("getting status of struts...")
+        # print(f"strut 1 is: {await robot.get_status("SPVVVECTR1")}")
+        # print(f"strut 2 is: {await robot.get_status("SPVVVECTR2")}")
+        # print(f"strut 3 is: {await robot.get_status("SPVVVECTR3")}")
 
 
         # run for 20 seconds 
@@ -120,7 +132,6 @@ async def main():
     # (1) priors - 15 trials 
 
     print(f"Prior inputs are: {initial_points_x}")
-    initial_points_y = []
     for rpm_combo in initial_points_x:
         displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
         opt.tell(rpm_combo.tolist(), -displacement) # negative for max

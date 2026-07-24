@@ -146,8 +146,10 @@ class SPVVVECTR():
         @return: "ONLINE" if connected, "OFFLINE" otherwise.
         '''
         if name in self.struts:
+            self.struts_status[name] = self.struts[name].get_status()
             return self.struts_status[name]
         else:
+            print ("Invalid name!")
             return None
     
     async def get_all_status(self):
@@ -155,6 +157,8 @@ class SPVVVECTR():
         Get the current status of all struts.\n
         @return: A copy of the dictionary containing the status of all struts.
         '''
+        for name in self.config:
+            await self.get_status(name)
         return copy.copy(self.struts_status)
 
 
@@ -303,8 +307,8 @@ if __name__ == "__main__":
         robot = SPVVVECTR()
         print ("Robot initialized.")
 
-        work_dir = input("Enter working directory for CSV files: ")
-        await robot.choose_working_directory(work_dir)
+        # work_dir = input("Enter working directory for CSV files: ")
+        # await robot.choose_working_directory(work_dir)
 
         while True:
             user_input = input("Choose a number:\n"
@@ -318,7 +322,7 @@ if __name__ == "__main__":
                     await robot.connect_all()
                     print (await robot.get_all_status())
                 case "2":
-                    await robot.disconnect_all()
+                    #await robot.disconnect_all()
                     print (await robot.get_all_status())
                 case "3":
                     speed = input("Target RPM: ")
@@ -346,4 +350,4 @@ if __name__ == "__main__":
         await robot.disconnect_all()
         print("Test completed.")
 
-    asyncio.run(test_1())
+    asyncio.run(test_2())
