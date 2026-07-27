@@ -125,20 +125,21 @@ async def main():
     await asyncio.sleep(2) 
 
     # account noise from variance testing 
-    noise_variance = 3799.32 
+    #noise_variance = 3799.32 # might let BO handle calculating noise since there were some conflicts
 
     gp = GaussianProcessRegressor(
         kernel=Matern(nu=2.5), # the smoothness of curve
-        alpha=noise_variance,
-        normalize_y=False
+        #alpha=noise_variance,
+        normalize_y=True,
+        noise='gaussian'
     )
 
     bounds = [Integer(-1000, 1000), Integer(-1000, 1000), Integer(-1000, 1000)]
     opt = Optimizer(bounds, base_estimator=gp, acq_func="EI")
     
     # generate priors
-    #initial_points_x = generate_random_priors(15)
-    initial_points_x = generate_lhs_priors(opt)
+    initial_points_x = generate_random_priors(15)
+    #initial_points_x = generate_lhs_priors(opt)
 
     total_trials = 50
     current_trial = 1 
