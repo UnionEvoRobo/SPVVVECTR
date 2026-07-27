@@ -130,15 +130,15 @@ async def main():
     gp = GaussianProcessRegressor(
         kernel=Matern(nu=2.5), # the smoothness of curve
         alpha=noise_variance,
-        normalize_y=True
+        normalize_y=False
     )
 
     bounds = [Integer(-1000, 1000), Integer(-1000, 1000), Integer(-1000, 1000)]
     opt = Optimizer(bounds, base_estimator=gp, acq_func="EI")
     
     # generate priors
-    initial_points_x = generate_random_priors(15)
-    #inital_points_x = generate_lhs_priors(opt)
+    #initial_points_x = generate_random_priors(15)
+    initial_points_x = generate_lhs_priors(opt)
 
     total_trials = 50
     current_trial = 1 
@@ -147,7 +147,9 @@ async def main():
     print(f"Prior inputs are: {initial_points_x}")
     for rpm_combo in initial_points_x:
         displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
-        opt.tell(rpm_combo.tolist(), -displacement) # negative for max
+        # Force the values into standard Python integers so skopt never complains
+        clean_rpm = [int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2])]
+        opt.tell(clean_rpm, -displacement) # negative for max
         
         # --- SAVE TO CSV ---
         with open(csv_filename, mode='a', newline='') as file:
