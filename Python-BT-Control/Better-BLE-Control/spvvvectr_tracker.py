@@ -18,7 +18,7 @@ class QtmTracker():
         if self.connection:
             print("Im connected to qtm W!")
             # Stream continuously, pushing data to the callback
-            await self.connection.stream_frames(components=["6d"], on_packet=self._on_packet)
+            await self.connection.stream_frames(components=["6deuler"], on_packet=self._on_packet)
 
     async def _connect_to_qtm(self):
             """Attempts to connect to QTM until successful."""
@@ -37,7 +37,7 @@ class QtmTracker():
 
     def _on_packet(self, packet):
         """Callback fired by qtm_rt every time a frame arrives."""
-        info, bodies = packet.get_6d()
+        info, bodies = packet.get_6d_euler()
         
         # Assuming you just want the first tracked body for now
         for index, position in enumerate(bodies):

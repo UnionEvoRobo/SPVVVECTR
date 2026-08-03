@@ -57,6 +57,15 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
         if start_pos and final_pos:
             displacement = math.sqrt((final_pos.x - start_pos.x)**2 + (final_pos.y - start_pos.y)**2)
 
+            # specific axis displacements 
+            x_displacement = final_pos.x - start_pos.x
+            y_displacement = final_pos.y - start_pos.y
+            z_displacement = final_pos.z - start_pos.z
+
+            # yaw data (confirm if yaw data is reliable)
+            yaw_displacement = final_pos.yaw - start_pos.yaw
+            yaw_displacement = (yaw_displacement + 180) % 360 - 180 # normalized
+
             if math.isnan(displacement):
                 print("Displacement was nan for some reason, maybe qualisys. retry!")
                 displacement = 0.0
@@ -74,7 +83,7 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
         )
 
         if decision.lower().strip() == 's':
-            return displacement
+            return displacement, x_displacement, y_displacement, z_displacement, yaw_displacement
         
         else:
             print("Discarding and trying again.")
@@ -160,7 +169,7 @@ async def bayesian_optimization(method):
     if method == "random priors" or method == "lhs priors":
         print(f"Prior inputs (method: {method}): {initial_points_x}")
         for rpm_combo in initial_points_x:
-            displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
+            displacement, x_displacement, y_displacement, z_displacement, yaw_displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
             # Force the values into standard Python integers so skopt never complains
             clean_rpm = [int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2])]
             opt.tell(clean_rpm, -displacement) # negative for max
@@ -176,7 +185,7 @@ async def bayesian_optimization(method):
 
     for i in range(optimize_trials):
         next_rpm = opt.ask()
-        displacement = await run_physical_trials(next_rpm, current_trial, total_trials, robot, tracker)
+        displacement, x_displacement, y_displacement, z_displacement, yaw_displacement = await run_physical_trials(next_rpm, current_trial, total_trials, robot, tracker)
         opt.tell(next_rpm, -displacement)
         
         # save each trial to csv 
