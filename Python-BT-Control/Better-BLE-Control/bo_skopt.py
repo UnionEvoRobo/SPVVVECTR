@@ -102,12 +102,67 @@ def generate_lhs_priors(opt):
     initial_points = lhs.generate(opt.space.dimensions, 15)
     return initial_points
 
+
+def convert_csv_to_rpm_combos(csv_filename):
+    """
+    Converts a csv file of previous BO results into a list of rpm combos for rerunning and increasing sample size, n.
+    """
+
+    rpm_combos = []
+    with open(csv_filename, mode='r') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            rpm_combo = [int(row["RPM_1"]), int(row["RPM_2"]), int(row["RPM_3"])]
+            rpm_combos.append(rpm_combo)
+    return rpm_combos
+
+async def rerun_exact_rpms(rpm_combos):
+    """
+    rerun exact rpm combos from previous BO experiments, to increase sample size and account for noise in data.
+    rpm_combos: list of lists, each inner list is a 3-element list of RPM values
+    output: saves results to a new csv file with timestamp
+    """
+
+    print("Starting Robot & Tracker...")
+    robot = SPVVVECTR()
+    await robot.connect_all()
+    tracker = QtmTracker("10.76.30.85")
+    await asyncio.sleep(2)
+
+    # csv
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    csv_filename = f"bo_rerun_results_{timestamp}.csv"
+
+    # initialize the file and write the header row
+    with open(csv_filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["Trial_Number", "RPM_1", "RPM_2", "RPM_3", "Displacement_mm"])
+
+    print(f"Saving data to: {csv_filename}")
+
+    total_trials = len(rpm_combos)
+    current_trial = 1
+
+    for rpm_combo in rpm_combos:
+        displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
+
+        # save each trial to csv 
+        with open(csv_filename, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([current_trial, int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2]), round(displacement, 2)])
+
+        current_trial += 1
+
+    print("Rerun of exact RPM combos complete!")
+    print(f"All results fully saved to {csv_filename}")
+
+
 async def bayesian_optimization(method):
     """
     Runs the full Bayesian Optimization process with the specified method for generating priors.
     method: str - "random priors", "lhs priors", or "no priors"
     """
-    
+
     print("Starting Robot & Tracker...")
 
     # csv
@@ -152,6 +207,7 @@ async def bayesian_optimization(method):
 
     else:
         optimize_trials = 50
+        opt = Optimizer(bounds, base_estimator=gp, acq_func="EI", n_initial_points=1)
 
     if method == "random priors" or method == "lhs priors":
         print(f"Prior inputs are: {initial_points_x}")
@@ -193,112 +249,14 @@ async def bayesian_optimization(method):
 
 
 async def main():
+
+    # experiment 1 #
     await bayesian_optimization("random priors")
-    await bayesian_optimization("lhs priors")
-    await bayesian_optimization("no priors")
-    # print("Starting robot & tracker...")
+    # random_priors_rerun = convert_csv_to_rpm_combos("") # replace with path
+    # await rerun_exact_rpms(random_priors_rerun)
 
-    # # --- CSV SETUP ---
-    # # Create a unique filename based on the current date and time
-    # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # csv_filename = f"bo_results_{timestamp}.csv"
-    
-    # # Initialize the file and write the header row
-    # with open(csv_filename, mode='w', newline='') as file:
-    #     writer = csv.writer(file)
-    #     writer.writerow(["Trial_Number", "Phase", "RPM_1", "RPM_2", "RPM_3", "Displacement_mm"])
-    
-    # print(f"Saving data to: {csv_filename}")
-    # # -----------------
+    # await bayesian_optimization("lhs priors")
+    # await bayesian_optimization("no priors")
 
-    # # connect hardware 
-    # robot = SPVVVECTR()
-    # await robot.connect_all()
-    # tracker = QtmTracker("10.76.30.85")
-    # await asyncio.sleep(2) 
-
-    # # account noise from variance testing 
-    # #noise_variance = 3799.32 # might let BO handle calculating noise since there were some conflicts
-
-    # gp = GaussianProcessRegressor(
-    #     kernel=Matern(nu=2.5), # the smoothness of curve
-    #     #alpha=noise_variance,
-    #     normalize_y=True,
-    #     noise='gaussian'
-    # )
-
-    # bounds = [Integer(-1000, 1000), Integer(-1000, 1000), Integer(-1000, 1000)]
-    # opt = Optimizer(bounds, base_estimator=gp, acq_func="EI")
-    
-    # # generate priors
-    # initial_points_x = generate_random_priors(15)
-    # #initial_points_x = generate_lhs_priors(opt)
-    # #print("EXPERIMENT 3: 50 STEPS, NO PRIORS")
-
-    # total_trials = 50
-    # current_trial = 1 
-
-    # # (1) priors - 15 trials 
-    # print(f"Prior inputs are: {initial_points_x}")
-    # for rpm_combo in initial_points_x:
-    #     displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
-    #     # Force the values into standard Python integers so skopt never complains
-    #     clean_rpm = [int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2])]
-    #     opt.tell(clean_rpm, -displacement) # negative for max
-        
-    #     # --- SAVE TO CSV ---
-    #     with open(csv_filename, mode='a', newline='') as file:
-    #         writer = csv.writer(file)
-    #         writer.writerow([current_trial, "Prior", int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2]), round(displacement, 2)])
-        
-    #     current_trial += 1
-    
-    # print("Done with priors...")
-    
-    # # (2) optimization - 35 trials 
-    # for i in range(50):
-    #     next_rpm = opt.ask()
-    #     displacement = await run_physical_trials(next_rpm, current_trial, total_trials, robot, tracker)
-    #     opt.tell(next_rpm, -displacement)
-        
-    #     # --- SAVE TO CSV ---
-    #     with open(csv_filename, mode='a', newline='') as file:
-    #         writer = csv.writer(file)
-    #         writer.writerow([current_trial, "Optimization", int(next_rpm[0]), int(next_rpm[1]), int(next_rpm[2]), round(displacement, 2)])
-            
-    #     current_trial += 1
-        
-    # # results 
-    # print("Bayesian Optimization Complete!")
-    # best_index = opt.yi.index(min(opt.yi))
-    # best_rpm = opt.Xi[best_index]
-    # best_displacement = -opt.yi[best_index]
-    
-    # # Theoretical results from the model
-    # res = opt.get_result()
-    # theoretical_rpm = res.x
-    # theoretical_disp = -res.fun
-
-    # print(f"Best Observed Gait is: {best_rpm}")
-    # print(f"Results in max displacement of: {best_displacement:.2f} mm")
-    # print(f"Theoretical Predicted Gait is: {theoretical_rpm}")
-    # print(f"Theoretical Max Displacement: {theoretical_disp:.2f} mm")
-
-    # # --- SAVE FINAL RESULTS TO CSV ---
-    # with open(csv_filename, mode='a', newline='') as file:
-    #     writer = csv.writer(file)
-    #     writer.writerow([]) # Blank row for readability
-    #     writer.writerow(["--- FINAL BO RESULTS ---"])
-    #     writer.writerow(["Category", "RPM_1", "RPM_2", "RPM_3", "Displacement_mm"])
-    #     writer.writerow(["Best Observed", int(best_rpm[0]), int(best_rpm[1]), int(best_rpm[2]), round(best_displacement, 2)])
-    #     writer.writerow(["Theoretical Predicted", int(theoretical_rpm[0]), int(theoretical_rpm[1]), int(theoretical_rpm[2]), round(theoretical_disp, 2)])
-    
-    # print(f"All results fully saved to {csv_filename}")
-
-    # # saving the ml model 
-    # pkl_filename = f"bo_model_{timestamp}.pkl"
-    # dump(res, pkl_filename)
-    # print(f"Gaussian Process model now dumped into {pkl_filename}")
-    
 if __name__ == "__main__":
     asyncio.run(main())
