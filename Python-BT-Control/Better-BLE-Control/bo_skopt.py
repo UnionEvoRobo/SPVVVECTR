@@ -158,7 +158,7 @@ async def bayesian_optimization(method):
         opt = Optimizer(bounds, base_estimator=gp, acq_func="EI", n_initial_points=1)
 
     if method == "random priors" or method == "lhs priors":
-        print(f"Prior inputs are: {initial_points_x}")
+        print(f"Prior inputs (method: {method}): {initial_points_x}")
         for rpm_combo in initial_points_x:
             displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
             # Force the values into standard Python integers so skopt never complains
@@ -250,14 +250,49 @@ async def append_displacements(csv_filename):
 
         print(f"Column {d_i} complete. Results saved to {out_filename}")
 
+def add_mean_column(csv_filename):
+    """
+    Add a Displacement_mm_mean column averaging the three replicate columns.
+    Writes to {stem}_mean.csv.
+    """
+    with open(csv_filename, mode='r', newline='') as file:
+        reader = csv.DictReader(file)
+        headers = [h.strip() for h in reader.fieldnames]
+        rows = list(reader)
+
+    cols = [f"Displacement_mm_{i}" for i in (1, 2, 3)]
+    missing = [c for c in cols if c not in headers]
+    if missing:
+        raise ValueError(f"Missing column(s): {missing}. Found: {headers}")
+
+    new_col = "Displacement_mm_mean"
+    headers = headers + [new_col]
+
+    for n, row in enumerate(rows, start=1):
+        try:
+            values = [float(row[c]) for c in cols]
+        except (TypeError, ValueError):
+            raise ValueError(f"Row {n} has a blank or non-numeric displacement: "
+                            f"{[row[c] for c in cols]}")
+        row[new_col] = round(sum(values) / len(values), 2)
+
+    stem, ext = os.path.splitext(csv_filename)
+    out_filename = f"{stem}_mean{ext}"
+    with open(out_filename, 'w', newline='') as file:
+        writer = csv.DictWriter(file, headers)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    print(f"Mean column added for {len(rows)} rows -> {out_filename}")
+    return out_filename
+
+
 async def main():
 
     """ experiment 1 """
-    await bayesian_optimization("random priors")
-    #await append_displacements("") 
-
-
-
+    #await bayesian_optimization("lhs priors")
+    #await append_displacements("./bo_spvvvectr-1b-lhs_r2.csv")
+    add_mean_column("./bo_spvvvectr-1b-lhs_r3.csv")
 
     """ experiment 2 """
     # await bayesian_optimization("lhs priors")
