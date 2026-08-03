@@ -138,29 +138,29 @@ async def main():
     opt = Optimizer(bounds, base_estimator=gp, acq_func="EI")
     
     # generate priors
-    #initial_points_x = generate_random_priors(15)
+    initial_points_x = generate_random_priors(15)
     #initial_points_x = generate_lhs_priors(opt)
-    print("EXPERIMENT 3: 50 STEPS, NO PRIORS")
+    #print("EXPERIMENT 3: 50 STEPS, NO PRIORS")
 
     total_trials = 50
     current_trial = 1 
 
     # (1) priors - 15 trials 
-    # print(f"Prior inputs are: {initial_points_x}")
-    # for rpm_combo in initial_points_x:
-    #     displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
-    #     # Force the values into standard Python integers so skopt never complains
-    #     clean_rpm = [int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2])]
-    #     opt.tell(clean_rpm, -displacement) # negative for max
+    print(f"Prior inputs are: {initial_points_x}")
+    for rpm_combo in initial_points_x:
+        displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
+        # Force the values into standard Python integers so skopt never complains
+        clean_rpm = [int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2])]
+        opt.tell(clean_rpm, -displacement) # negative for max
         
-    #     # --- SAVE TO CSV ---
-    #     with open(csv_filename, mode='a', newline='') as file:
-    #         writer = csv.writer(file)
-    #         writer.writerow([current_trial, "Prior", int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2]), round(displacement, 2)])
+        # --- SAVE TO CSV ---
+        with open(csv_filename, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([current_trial, "Prior", int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2]), round(displacement, 2)])
         
-    #     current_trial += 1
+        current_trial += 1
     
-    #print("Done with priors...")
+    print("Done with priors...")
     
     # (2) optimization - 35 trials 
     for i in range(50):
