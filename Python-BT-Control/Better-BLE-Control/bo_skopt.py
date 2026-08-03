@@ -2,6 +2,8 @@ import numpy as np
 import asyncio
 import math
 import csv
+import os
+import re
 from datetime import datetime
 from spvvvectr_tracker import QtmTracker
 from SPVVVECTR_Class import SPVVVECTR
@@ -103,60 +105,6 @@ def generate_lhs_priors(opt):
     return initial_points
 
 
-def convert_csv_to_rpm_combos(csv_filename):
-    """
-    Converts a csv file of previous BO results into a list of rpm combos for rerunning and increasing sample size, n.
-    """
-
-    rpm_combos = []
-    with open(csv_filename, mode='r') as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            rpm_combo = [int(row["RPM_1"]), int(row["RPM_2"]), int(row["RPM_3"])]
-            rpm_combos.append(rpm_combo)
-    return rpm_combos
-
-async def rerun_exact_rpms(rpm_combos):
-    """
-    rerun exact rpm combos from previous BO experiments, to increase sample size and account for noise in data.
-    rpm_combos: list of lists, each inner list is a 3-element list of RPM values
-    output: saves results to a new csv file with timestamp
-    """
-
-    print("Starting Robot & Tracker...")
-    robot = SPVVVECTR()
-    await robot.connect_all()
-    tracker = QtmTracker("10.76.30.85")
-    await asyncio.sleep(2)
-
-    # csv
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_filename = f"bo_rerun_results_{timestamp}.csv"
-
-    # initialize the file and write the header row
-    with open(csv_filename, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(["Trial_Number", "RPM_1", "RPM_2", "RPM_3", "Displacement_mm"])
-
-    print(f"Saving data to: {csv_filename}")
-
-    total_trials = len(rpm_combos)
-    current_trial = 1
-
-    for rpm_combo in rpm_combos:
-        displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
-
-        # save each trial to csv 
-        with open(csv_filename, mode='a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow([current_trial, int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2]), round(displacement, 2)])
-
-        current_trial += 1
-
-    print("Rerun of exact RPM combos complete!")
-    print(f"All results fully saved to {csv_filename}")
-
-
 async def bayesian_optimization(method):
     """
     Runs the full Bayesian Optimization process with the specified method for generating priors.
@@ -172,7 +120,7 @@ async def bayesian_optimization(method):
     # initialize the file and write the header row
     with open(csv_filename, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["Trial_Number", "Phase", "RPM_1", "RPM_2", "RPM_3", "Displacement_mm"])
+        writer.writerow(["Trial_Number", "Phase", "RPM_1", "RPM_2", "RPM_3", "Displacement_mm_1"])
 
 
     print(f"Saving data to: {csv_filename}")
@@ -248,14 +196,73 @@ async def bayesian_optimization(method):
     print(f"Gaussian Process model now dumped into {pkl_filename}")
 
 
+def _next_displacement_column(headers):
+    """Return (headers + new column, new column name, replicate index)."""
+    used = [int(h.rsplit("_", 1)[1]) for h in headers
+            if h.startswith("Displacement_mm_")]
+    d_i = max(used) + 1
+    new_col = f"Displacement_mm_{d_i}"
+    return headers + [new_col], new_col, d_i
+
+async def append_displacements(csv_filename):
+    """
+    rerun every rpm combo in existing csv and append the displacements 
+    as a new Displacement_mm_{i} column.
+    """
+
+    with open(csv_filename, mode='r', newline='') as file:
+        reader = csv.DictReader(file)
+        headers = reader.fieldnames
+        rows = list(reader)
+
+        headers, new_col, d_i = _next_displacement_column(headers)
+        for row in rows:
+            row[new_col] = ""
+
+        stem, ext = os.path.splitext(csv_filename)
+        stem = re.sub(r"_r\d+$", "", stem)
+        out_filename = f"{stem}_r{d_i}{ext}"
+
+        def flush():
+            with open(out_filename, 'w', newline='') as file:
+                writer = csv.DictWriter(file, headers)
+                writer.writeheader()
+                writer.writerows(rows)
+
+        flush()
+        print(f"d_i {d_i} of {len(rows)} combos -> {out_filename}")
+
+        print("Starting Robot & Tracker...")
+        robot = SPVVVECTR()
+        await robot.connect_all()
+        tracker = QtmTracker("10.76.30.85")
+        await asyncio.sleep(2)
+
+        order = list(range(len(rows)))
+
+        for n, index in enumerate(order, start=1):
+            row = rows[index]
+            rpm_combo = [int(row["RPM_1"]), int(row["RPM_2"]), int(row["RPM_3"])]
+            print(f"Re-running combo {n}/{len(rows)}: {rpm_combo}")
+            displacement = await run_physical_trials(rpm_combo, n, len(order), robot, tracker)
+            row[new_col] = round(displacement, 2)
+            flush()
+
+        print(f"Column {d_i} complete. Results saved to {out_filename}")
+
 async def main():
 
-    # experiment 1 #
+    """ experiment 1 """
     await bayesian_optimization("random priors")
-    # random_priors_rerun = convert_csv_to_rpm_combos("") # replace with path
-    # await rerun_exact_rpms(random_priors_rerun)
+    #await append_displacements("") 
 
+
+
+
+    """ experiment 2 """
     # await bayesian_optimization("lhs priors")
+
+    """ experiment 3 """
     # await bayesian_optimization("no priors")
 
 if __name__ == "__main__":
