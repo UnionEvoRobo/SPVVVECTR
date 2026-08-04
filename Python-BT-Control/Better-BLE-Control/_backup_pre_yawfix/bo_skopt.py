@@ -21,8 +21,7 @@ YAW_INDEX = 2
 NAN = float('nan')
 
 # Per-replicate column bases, in write order.
-REPLICATE_COLS = ["Displacement_mm", "X_mm", "Y_mm", "Z_mm", "Yaw_deg",
-                  "Start_X_mm", "Start_Y_mm", "Start_Z_mm"]
+REPLICATE_COLS = ["Displacement_mm", "X_mm", "Y_mm", "Z_mm", "Yaw_deg"]
 
 
 def _unpack_pose(data):
@@ -68,33 +67,14 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot: SPVVVEC
             print("WARNING: QTM stream looks stale — data may be frozen.")
 
         await print_status(robot)
-        # start position, logged as a terrain covariate (the floor is not level)
-        if start_pos is not None:
-            start_x, start_y, start_z = start_pos.x, start_pos.y, start_pos.z
-        else:
-            start_x = start_y = start_z = NAN
-
         await robot.set_speed(name="SPVVVECTR1", value=int(rpm_combo[0]))
         await robot.set_speed(name="SPVVVECTR2", value=int(rpm_combo[1]))
         await robot.set_speed(name="SPVVVECTR3", value=int(rpm_combo[2]))
 
-        # run for 60 seconds, accumulating unwrapped yaw at 10 Hz.
-        # Differencing only the endpoints aliases any rotation past +/-180 deg.
-        cumulative_yaw = 0.0
-        prev_yaw = start_yaw
-        yaw_ok = start_yaw is not None
-
-        for tick in range(60 * 10):
-            await asyncio.sleep(0.1)
-            if tick % 10 == 0:
-                print(f"Running... {60 - tick // 10} seconds left", end="\r")
-            _, y_now = _unpack_pose(tracker.get_current_pos())
-            if y_now is None or prev_yaw is None:
-                yaw_ok = False
-                continue
-            # each step is ~0.23 deg at this rate, far below the 180 deg ambiguity limit
-            cumulative_yaw += (y_now - prev_yaw + 180) % 360 - 180
-            prev_yaw = y_now
+        # run for 60 seconds
+        for i in range(60):
+            print(f"Running... {60-i} seconds left", end="\r")
+            await asyncio.sleep(1)
 
         # stop motors
         await robot.stop_all()
@@ -111,9 +91,9 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot: SPVVVEC
             z_displacement = final_pos.z - start_pos.z
             displacement = math.hypot(x_displacement, y_displacement)
 
-            # total yaw rotation accumulated during the run; unbounded, does not alias
-            if yaw_ok and final_yaw is not None and prev_yaw is not None:
-                yaw_displacement = cumulative_yaw + ((final_yaw - prev_yaw + 180) % 360 - 180)
+            # yaw change, normalized to [-180, 180)
+            if start_yaw is not None and final_yaw is not None:
+                yaw_displacement = (final_yaw - start_yaw + 180) % 360 - 180
             else:
                 yaw_displacement = NAN
                 print("Yaw unavailable for this trial.")
@@ -133,8 +113,7 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot: SPVVVEC
         )
 
         if decision.lower().strip() == 's':
-            return (displacement, x_displacement, y_displacement, z_displacement,
-                    yaw_displacement, start_x, start_y, start_z)
+            return displacement, x_displacement, y_displacement, z_displacement, yaw_displacement
 
         else:
             print("Discarding and trying again.")
@@ -221,10 +200,12 @@ async def bayesian_optimization(method):
         opt = Optimizer(bounds, base_estimator=gp, acq_func="EI", n_initial_points=1)
 
     def write_trial(trial, phase, rpm, results):
+        displacement, x_d, y_d, z_d, yaw_d = results
         with open(csv_filename, mode='a', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow([trial, phase, int(rpm[0]), int(rpm[1]), int(rpm[2])]
-                            + [round(v, 2) for v in results])
+            writer.writerow([trial, phase, int(rpm[0]), int(rpm[1]), int(rpm[2]),
+                             round(displacement, 2), round(x_d, 2), round(y_d, 2),
+                             round(z_d, 2), round(yaw_d, 2)])
 
     if method == "random priors" or method == "lhs priors":
         print(f"Prior inputs (method: {method}): {initial_points_x}")

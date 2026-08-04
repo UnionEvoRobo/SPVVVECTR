@@ -25,14 +25,12 @@ async def variance_recording(rpm, num_trials):
     with open(csv_filename, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(["Trial_Number", "Linear_Displacement_mm", "x_change_mm",
-                         "y_change_mm", "z_change_mm", "yaw_change_deg",
-                         "start_x_mm", "start_y_mm", "start_z_mm"])
+                         "y_change_mm", "z_change_mm", "yaw_change_deg"])
 
     print(f"Saving data to: {csv_filename}")
 
     for i in range(num_trials):
-        (displacement, x_d, y_d, z_d, yaw_d,
-         start_x, start_y, start_z) = await bo_skopt.run_physical_trials(
+        displacement, x_d, y_d, z_d, yaw_d = await bo_skopt.run_physical_trials(
             rpm, i + 1, num_trials, robot, tracker
         )
 
@@ -40,8 +38,7 @@ async def variance_recording(rpm, num_trials):
         with open(csv_filename, 'a', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([i + 1, f'{displacement:.2f}', f'{x_d:.2f}',
-                             f'{y_d:.2f}', f'{z_d:.2f}', f'{yaw_d:.2f}',
-                             f'{start_x:.2f}', f'{start_y:.2f}', f'{start_z:.2f}'])
+                             f'{y_d:.2f}', f'{z_d:.2f}', f'{yaw_d:.2f}'])
 
         print(f"Appended trial {i + 1} to {csv_filename}")
 
