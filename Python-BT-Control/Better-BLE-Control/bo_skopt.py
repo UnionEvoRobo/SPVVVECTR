@@ -14,6 +14,26 @@ from skopt.sampler import Lhs
 from skopt.learning import GaussianProcessRegressor
 from skopt.learning.gaussian_process.kernels import Matern 
 
+async def run_single_trial(rpm_combo, robot, seconds):
+    """Handles 20 second single trial"""
+
+    print(f"Starting Trial...")
+
+    await print_status(robot)
+    await robot.set_speed(name="SPVVVECTR1", value=int(rpm_combo[0]))
+    await robot.set_speed(name="SPVVVECTR2", value=int(rpm_combo[1]))
+    await robot.set_speed(name="SPVVVECTR3", value=int(rpm_combo[2]))
+
+    for i in range(seconds):
+        print(f"Running... {seconds-i} seconds left", end="\r")
+        await asyncio.sleep(1)
+
+    await robot.stop_all()
+    
+
+
+
+
 async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECTR, tracker):
     """Handles 20 second trials, tracking, and user choice to save/retry trial"""
 
@@ -290,15 +310,18 @@ def add_mean_column(csv_filename):
 async def main():
 
     """ experiment 1 """
-    #await bayesian_optimization("lhs priors")
+   #await bayesian_optimization("lhs priors")
     #await append_displacements("./bo_spvvvectr-1b-lhs_r2.csv")
-    add_mean_column("./bo_spvvvectr-1b-lhs_r3.csv")
+    #add_mean_column("./bo_spvvvectr-1b-lhs_r3.csv")
 
-    """ experiment 2 """
-    # await bayesian_optimization("lhs priors")
+    #await run_physical_trials([982, 414, -301], 1, 1, robot=SPVVVECTR(), tracker=QtmTracker("10.76.30.85"))
+    robot=SPVVVECTR()
+    await robot.connect_all()
+    await run_single_trial([982, 414, -301], robot, 20)
+    #await run_single_trial([-943,812,-176], robot, 20)
+    #await asyncio.sleep(1)
+    #await run_single_trial([982, 414, -301], robot)
 
-    """ experiment 3 """
-    # await bayesian_optimization("no priors")
 
 if __name__ == "__main__":
     asyncio.run(main())

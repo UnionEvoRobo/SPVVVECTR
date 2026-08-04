@@ -32,14 +32,15 @@ async def variance_recording(rpm, num_trials):
 
 async def main():
     # top 3 best observed trials from spvvvectr-1b BO w/ LHS priors; means of 3 trials each
-    rpm1 = [982, 414, -301]
-    rpm2 = [1000, 417, -243]
-    rpm3 = [-914, -379, 981]
-    num_trials = 50
+    rpm = [1000, 1000, 1000]
+    #rpm1 = [886, -24, 479]
+    #line_gait = [982, 414, -301]
+    #rpm2 = [907, 136, 532]
+    #rpm3 = [879, 41, 523]
+    num_trials = 20
     
-    await variance_recording(rpm1, num_trials)
-    await variance_recording(rpm2, num_trials)
-    await variance_recording(rpm3, num_trials)
+    await variance_recording(rpm, num_trials)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
