@@ -12,6 +12,7 @@ Repositioning after every trial to maintain starting position and orientation as
 2. Bayesian Optimization 
     
     * 15 lhs; 35 opt steps 
+    *extra - found -943,812,-176 is good at rotating*
 
 3. variances testing w/ fittest 3 gaits 
 
