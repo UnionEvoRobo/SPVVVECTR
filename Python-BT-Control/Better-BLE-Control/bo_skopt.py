@@ -76,6 +76,10 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
 
         if start_pos and final_pos:
             displacement = math.sqrt((final_pos.x - start_pos.x)**2 + (final_pos.y - start_pos.y)**2)
+            x_diff = final_pos.x - start_pos.x
+            y_diff = final_pos.z - start_pos.y
+            z_diff = final_pos.z - start_pos.z
+
 
             if math.isnan(displacement):
                 print("Displacement was nan for some reason, maybe qualisys. retry!")
@@ -94,7 +98,7 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
         )
 
         if decision.lower().strip() == 's':
-            return displacement
+            return displacement, x_diff, y_diff, z_diff
         
         else:
             print("Discarding and trying again.")
@@ -140,7 +144,7 @@ async def bayesian_optimization(method):
     # initialize the file and write the header row
     with open(csv_filename, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["Trial_Number", "Phase", "RPM_1", "RPM_2", "RPM_3", "Displacement_mm_1"])
+        writer.writerow(["Trial_Number", "Phase", "RPM_1", "RPM_2", "RPM_3", "Displacement_mm, x_diff, y_diff, z_diff"])
 
 
     print(f"Saving data to: {csv_filename}")
@@ -217,9 +221,15 @@ async def bayesian_optimization(method):
 
 
 def _next_displacement_column(headers):
-    """Return (headers + new column, new column name, replicate index)."""
-    used = [int(h.rsplit("_", 1)[1]) for h in headers
-            if h.startswith("Displacement_mm_")]
+    """Return (headers + new column, new column name, header index)."""
+    
+    # used = [int(h.rsplit("_", 1)[1]) for h in headers
+    #         if h.startswith("Displacement_mm_")]
+
+    for header in headers:
+        if header.startswith("Displacement_mm_"):
+            used = [int(header.rsplit("_", 1)[1])]
+    
     d_i = max(used) + 1
     new_col = f"Displacement_mm_{d_i}"
     return headers + [new_col], new_col, d_i
@@ -309,18 +319,16 @@ def add_mean_column(csv_filename):
 
 async def main():
 
-    """ experiment 1 """
    #await bayesian_optimization("lhs priors")
     #await append_displacements("./bo_spvvvectr-1b-lhs_r2.csv")
     #add_mean_column("./bo_spvvvectr-1b-lhs_r3.csv")
-
     #await run_physical_trials([982, 414, -301], 1, 1, robot=SPVVVECTR(), tracker=QtmTracker("10.76.30.85"))
+
+
     robot=SPVVVECTR()
-    await robot.connect_all()
-    await run_single_trial([982, 414, -301], robot, 20)
-    #await run_single_trial([-943,812,-176], robot, 20)
-    #await asyncio.sleep(1)
-    #await run_single_trial([982, 414, -301], robot)
+    # await robot.connect_all()
+    # await run_single_trial([982, 414, -301], robot, 20)
+
 
 
 if __name__ == "__main__":

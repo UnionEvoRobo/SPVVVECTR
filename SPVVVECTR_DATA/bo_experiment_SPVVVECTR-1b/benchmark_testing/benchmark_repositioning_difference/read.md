@@ -1,4 +1,4 @@
-# SPVVVECTR-1b | 8/3/2026
+# SPVVVECTR-1b | 8/4/2026
 ## Difference b/w const/variable starting point & orientation - max Gait: [1000, 1000, 1000]
 ### FYI 
 
