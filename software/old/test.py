@@ -1,3 +1,8 @@
+# SPVVVECTR modules live in the parent directory (software/) after the
+# 2026 restructure; add it to sys.path so this legacy script still runs.
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from SPVVVECTR_Class import SPVVVECTR
 import tkinter as tk
 import asyncio

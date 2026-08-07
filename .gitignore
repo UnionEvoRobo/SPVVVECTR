@@ -1,1 +1,15 @@
+# macOS
 .DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Scratch: files staged for deletion during the restructure
+_to_delete/
