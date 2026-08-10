@@ -1,8 +1,6 @@
-# engineering/ — embedded firmware and hardware reference
+# engineering/ — hardware reference
 
-What runs *on the robot*, as opposed to `../software/`, which runs on the laptop.
-
-## firmware/
+## hardware/
 
 Arduino sketches. Each sketch keeps its own folder because the Arduino IDE
 requires the folder name to match the `.ino` file name.

@@ -32,4 +32,4 @@
 - ClassicBT_Control.py
 
 # SPVVVECTR Locomotion Optimization 
-*Look inside software directory for relevant README. 
+*Look inside software directory for relevant README.*

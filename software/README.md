@@ -1,7 +1,4 @@
-# software/ — host-side Python
-
-Everything that runs on the laptop. The microcontroller code it talks to lives
-in `../engineering/firmware/`; the data it produces lives in `../data/`.
+# software/
 
 ## Layout
 
@@ -13,12 +10,10 @@ in `../engineering/firmware/`; the data it produces lives in `../data/`.
 | `SPVVVECTR_GUI_Control.py` | Tkinter control panel. **Start here to drive the robot by hand.** |
 | `bo_skopt.py` | Bayesian optimization of the gait (scikit-optimize). Main experiment driver. |
 | `better_variance_recording.py` | Repeats one RPM combo N times to measure run-to-run variance. |
-| `analysis/` | Offline analysis — no hardware needed. Notebook + variance math. |
+| `analysis/` | Analysis of data from `.csv`/`.pkl` files. |
 | `tools/` | Small standalone utilities (BLE signal-strength check). |
-| `legacy/` | Superseded first-pass scripts, kept for reference. Not maintained. |
+| `legacy/` | Old scripts not used, kept for reference. |
 
-These six top-level modules import each other as flat siblings, so they must
-stay in this directory together.
 
 ## Running
 
@@ -28,10 +23,6 @@ python SPVVVECTR_GUI_Control.py     # manual control + recording
 python bo_skopt.py                  # gait optimization (needs robot + Qualisys)
 ```
 
-Scripts write their CSV/PKL output to the current working directory. Run them
-from wherever you want the results to land, then file the results under
-`../data/`. The GUI has a "select working directory" button for the same purpose.
+Scripts write their CSV/PKL output to current working directory. Move the results under `../data/`. The GUI has a "select working directory" that does the same thing. 
 
-The optimization scripts expect a Qualisys server at `10.76.30.85` (hardcoded in
-`bo_skopt.py` and `better_variance_recording.py`) and the strut MAC addresses in
-`../engineering/reference/MacAddr&UUID.txt`.
+The optimization scripts expect a Qualisys server at `10.76.30.85` and the strut MAC addresses in `../engineering/reference/MacAddr&UUID.txt`.

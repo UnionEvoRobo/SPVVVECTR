@@ -1,23 +1,16 @@
 # data/ — experiment results
 
-Read-only record of what the robot did. Nothing here is generated at import
-time; the scripts in `../software/` write new results to their working
-directory and they get filed here afterwards.
-
-Most subfolders carry a `read.md` describing that specific run — read those
-first.
+What the robot did after running programs in `/software` directory. Subfolders in this directory have `read.md` w/ specific experiment details.
 
 | Folder | What it holds |
 |---|---|
-| `initial-data-no-api/` | Earliest recordings, made before the motion-capture API was wired in. Raw CSV/TSV strut telemetry. |
-| `bo_experiment_SPVVVECTR-1a/` | First Bayesian-optimization campaign, comparing three prior strategies: `bo_results_lhs_priors/`, `bo_results_random_priors/`, `bo_results_no_priors/`. |
-| `bo_experiment_SPVVVECTR-1b/` | Second campaign. `lhs/` holds the two dated LHS+BO experiments, `benchmark_testing/` compares the optimized gait against a linear gait, `randoms_occasional_repositioning/` covers the repositioning study. |
+| `initial-data-no-api/` | Initial data before qtm api was integrated. |
+| `bo_experiment_SPVVVECTR-1a/` | First Bayesian-optimization trials w/ first iteration of spvvvectr (lighter body) that compared three prior strategies: `bo_results_lhs_priors/`, `bo_results_random_priors/`, `bo_results_no_priors/`. |
+| `bo_experiment_SPVVVECTR-1b/` | Second trials with rebuilt spvvvectr (thicker springs; heavier body). `lhs/` holds two LHS-Priors + BO experiments, `benchmark_testing/` compares BO gaits against pre-determined baselines, `randoms_occasional_repositioning/` tests effects of repositioning the robot after every trial / occasionally. |
 
 ## File types
 
-- `bo_results_*.csv` — one row per trial: RPM triple and measured displacement.
-- `bo_model_*.pkl` — pickled scikit-optimize result (the fitted Gaussian process).
-  Load with `skopt.load`.
+- `.csv` — records RPM inputs and measured displacement.
+- `.pkl` — trained optimizer model (w/ sci-kit optimize).
 - `variance_results_*.csv` — repeat trials of a single RPM triple, for noise estimation.
-
-`../software/analysis/visualization_bo_skopt.ipynb` reads these paths directly.
+`.ipynb` - data visualization + interpretation
