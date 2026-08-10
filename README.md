@@ -1,35 +1,30 @@
+# SPVVVECTR — Locomotion Optimization
 
-# SPVVVECTR Codes & Locomotion Optimization
+Microcontroller, BLE, and optimization code for controlling the SPVVVECTR robot
+and optimizing its linear displacement.
 
-## This repository contains the microcontroller, BLE, and Optimization/QTM code needed to control SPVVVECTR and optimize linear displacemet. 
+**Authors:** Miraj Parekh & Duy Hung Dang
 
-## author: Miraj Parekh & Duy Hung Dang
+## Layout
 
-## date: "August 7th, 2026"
-(This code is reuploaded)
+| Folder | What's in it |
+|---|---|
+| `software/` | Python control code, Bayesian optimization, and analysis. |
+| `engineering/` | Arduino firmware for the struts, plus hardware reference. |
+| `data/` | Experiment results (CSV, PKL) with notes per experiment. |
 
-### Code used:
-1. SPVVVECCTR-MCU-PP-BLE.ino
-- This is the code needed to operate the microcontroller ESP32 on each strut
-- This code uses Pulse Period to calculate RPM
-- This code uses BLE (Bluetooth Low-Energy) for Communication.
-- Flash this code onto each microcontroller before running the Python BLE code
+Each folder has its own README with details.
 
-2. BLE_Control.py
-- This is the code needed from the laptop (host) side to control SPVVVECTR remotely using BLE.
-- Run using VSCode with bleak installed using  pip install bleak
-- This is the primitive version of the control
+## Quick start
 
-3. Better BLE Control
-- Development finished (6/22/2026)
-- Provides the Object Classes for each PCB Strut, for the entire SPECTR robot (6 bar-3PCB), and the GUI for the controller.
-- Intended for Windows
+1. Flash `engineering/firmware/TinyPico-Code/SPVVVECTR-MCU-PP-BLE/` to each of
+   the three struts.
+2. Run the Python code **from inside `software/`**:
 
-4. Other notes:
-- The Classic Bluetooth version is also usable, albeit not as well as developed as the BLE version
-- This code will require 3 COM ports space on the laptop, so make sure you have some ports available
-- SPVVVECCTR-MCU-PP-BT.ino
-- ClassicBT_Control.py
+```bash
+pip install -r requirements.txt
+cd software
+python SPVVVECTR_GUI_Control.py # manual control + recording
+python bo_skopt.py              # gait optimization (needs Qualisys)
+```
 
-# SPVVVECTR Locomotion Optimization 
-*Look inside software directory for relevant README.*
