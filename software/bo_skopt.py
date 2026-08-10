@@ -45,11 +45,15 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
 
         print(f"Starting Trial {trial_num}...")
 
-        # get starting position 
-        start_data = tracker.get_current_pos() 
-        
+        # get starting position
+        start_data = tracker.get_current_pos()
+        start_pos = None
+        start_yaw = None
+
         if start_data:
             start_pos = start_data[0]
+            # tracker streams 6deuler, so [1] carries Euler angles; a1 is yaw
+            start_yaw = start_data[1].a1
         else:
             print("NO INITIAL STARTING POSITION FOUND (QTM ISSUE??)")
 
@@ -67,19 +71,26 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
         await robot.stop_all()
         print("Motors Stopped                        ")
 
-        # get final position & calculate displacement 
+        # get final position & calculate displacement
         final_data = tracker.get_current_pos()
+        final_pos = None
+        final_yaw = None
         if final_data:
             final_pos = final_data[0]
+            final_yaw = final_data[1].a1
         else:
             print("No final position data found")
 
         if start_pos and final_pos:
             displacement = math.sqrt((final_pos.x - start_pos.x)**2 + (final_pos.y - start_pos.y)**2)
             x_diff = final_pos.x - start_pos.x
-            y_diff = final_pos.z - start_pos.y
+            y_diff = final_pos.y - start_pos.y
             z_diff = final_pos.z - start_pos.z
 
+            if start_yaw is not None and final_yaw is not None:
+                yaw_rotation = final_yaw - start_yaw
+            else:
+                yaw_rotation = 0.0
 
             if math.isnan(displacement):
                 print("Displacement was nan for some reason, maybe qualisys. retry!")
@@ -87,9 +98,11 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
 
         else:
             displacement = 0.0
+            x_diff = y_diff = z_diff = 0.0
+            yaw_rotation = 0.0
             print("Tracking issue. Displacement not found, set to 0.0 by default")
 
-        print(f"Displacement: {displacement:.2f} mm")
+        print(f"Displacement: {displacement:.2f} mm | Yaw: {yaw_rotation:.2f} deg")
 
         await print_status(robot)
 
@@ -98,7 +111,7 @@ async def run_physical_trials(rpm_combo, trial_num, total_trials, robot:SPVVVECT
         )
 
         if decision.lower().strip() == 's':
-            return displacement, x_diff, y_diff, z_diff
+            return displacement, x_diff, y_diff, z_diff, yaw_rotation
         
         else:
             print("Discarding and trying again.")
@@ -144,7 +157,8 @@ async def bayesian_optimization(method):
     # initialize the file and write the header row
     with open(csv_filename, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["Trial_Number", "Phase", "RPM_1", "RPM_2", "RPM_3", "Displacement_mm, x_diff, y_diff, z_diff"])
+        writer.writerow(["Trial_Number", "Phase", "RPM_1", "RPM_2", "RPM_3", "Displacement_mm",
+                         "X_diff_mm", "Y_diff_mm", "Z_diff_mm", "Yaw_rotation_deg"])
 
 
     print(f"Saving data to: {csv_filename}")
@@ -184,7 +198,7 @@ async def bayesian_optimization(method):
     if method == "random priors" or method == "lhs priors":
         print(f"Prior inputs (method: {method}): {initial_points_x}")
         for rpm_combo in initial_points_x:
-            displacement = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
+            displacement, x_diff, y_diff, z_diff, yaw_rotation = await run_physical_trials(rpm_combo, current_trial, total_trials, robot, tracker)
             # Force the values into standard Python integers so skopt never complains
             clean_rpm = [int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2])]
             opt.tell(clean_rpm, -displacement) # negative for max
@@ -192,7 +206,8 @@ async def bayesian_optimization(method):
             # save each trial to csv 
             with open(csv_filename, mode='a', newline='') as file:
                 writer = csv.writer(file)
-                writer.writerow([current_trial, "Prior", int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2]), round(displacement, 2)])
+                writer.writerow([current_trial, "Prior", int(rpm_combo[0]), int(rpm_combo[1]), int(rpm_combo[2]), round(displacement, 2),
+                                 round(x_diff, 2), round(y_diff, 2), round(z_diff, 2), round(yaw_rotation, 2)])
             
             current_trial += 1
         
@@ -200,13 +215,14 @@ async def bayesian_optimization(method):
 
     for i in range(optimize_trials):
         next_rpm = opt.ask()
-        displacement = await run_physical_trials(next_rpm, current_trial, total_trials, robot, tracker)
+        displacement, x_diff, y_diff, z_diff, yaw_rotation = await run_physical_trials(next_rpm, current_trial, total_trials, robot, tracker)
         opt.tell(next_rpm, -displacement)
         
         # save each trial to csv 
         with open(csv_filename, mode='a', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow([current_trial, "Optimization", int(next_rpm[0]), int(next_rpm[1]), int(next_rpm[2]), round(displacement, 2)])
+            writer.writerow([current_trial, "Optimization", int(next_rpm[0]), int(next_rpm[1]), int(next_rpm[2]), round(displacement, 2),
+                             round(x_diff, 2), round(y_diff, 2), round(z_diff, 2), round(yaw_rotation, 2)])
             
         current_trial += 1
 
@@ -274,7 +290,7 @@ async def append_displacements(csv_filename):
             row = rows[index]
             rpm_combo = [int(row["RPM_1"]), int(row["RPM_2"]), int(row["RPM_3"])]
             print(f"Re-running combo {n}/{len(rows)}: {rpm_combo}")
-            displacement = await run_physical_trials(rpm_combo, n, len(order), robot, tracker)
+            displacement, x_diff, y_diff, z_diff, yaw_rotation = await run_physical_trials(rpm_combo, n, len(order), robot, tracker)
             row[new_col] = round(displacement, 2)
             flush()
 
