@@ -44,7 +44,6 @@ String name = "SPVVVECTR3";
 String name = "SPVVVECTR3";
 #define SERVICE_UUID        "e132a2ee-a68a-4b4b-98fa-29ef8bbc0be2"
 #define CHARACTERISTIC_UUID "ccba8d13-8743-45f7-9fd9-69a20a9acddc"
-
 BLECharacteristic *pGlobalCharacteristic; 
 bool sprint = true;
 
@@ -75,6 +74,12 @@ const float reduction_ratio = 10.0;         //Since the motor is 1:10 reduction
 const int   ppr_num = 7;                    //Inside encoder datasheet
 const float hall_resolution = reduction_ratio * ppr_num; 
 
+
+/*                Declare Other stuff  here                */
+const int PWM_resolution = 12;
+const int MAX_PWM = pow(2,PWM_resolution)-1;
+const int CPU_Freq = 120;                    //CPU Clock Speed in MHz
+
 //Encoder Pulse timer variables
 volatile unsigned long last_pulse_time = 0;
 volatile long delta_micros = 0;
@@ -82,9 +87,9 @@ volatile int  direction = 1;                //1 is CCW
 
 //Stall Detection variables
 volatile unsigned long stall_timer = 0;
-const unsigned long STALL_THRESHOLD_MS = 1000;  //time before killing power
-const float MIN_SAFE_RPM = 20.0;                //minimum RPM to be considered "moving"
-const int MAX_SPEED = 65535 * 20/100;           //pwm driver is 16-bit
+const unsigned long STALL_THRESHOLD_MS = 1000;    //time before killing power
+const float MIN_SAFE_RPM = 10.0;                  //minimum RPM to be considered "moving"
+const int STALL_SPEED = MAX_PWM * 15/100;           //max stall PWM allowed
 
 // Average calculation variables
 #define FILTER_SIZE 10
@@ -98,10 +103,12 @@ unsigned long prev_loop_time = 0;
 unsigned long prev_noti_time = 0;
 const float period_ms = 50; 
 float target_rpm = 0.0;                         //Set initial RPM here
+float last_target_rpm = 0.0;
 float speed = 0;                                //Set initial speed here
 const int MAX_RPM = 1000;                       //Set Maximum RPM here
 
 // PID  Controller Variables (Adjusted for 16-bit PWM)
+float output = 0;
 const float kP = 3;
 const float kD = 0.5;
 float error = 0;
@@ -169,8 +176,8 @@ class MyServerCallbacks: public BLEServerCallbacks {
 /*========================================================*/
 /*                  Main setup function                   */
 void setup() {
-
   Serial.begin (115200);
+  setCpuFrequencyMhz(80);
   pin_setup();
   ble_setup();
   mpu_setup();
@@ -189,6 +196,13 @@ void loop() {
   //MOTOR CONTROL LOGIC
   if (current_time - prev_loop_time >= period_ms) {
     prev_loop_time = current_time;
+
+    // 0.5. Flip detection logic
+    if (last_target_rpm * target_rpm < 0) {
+      analogWrite(EN_PIN, 0);
+      vTaskDelay(pdMS_TO_TICKS(150));
+    }
+    last_target_rpm = target_rpm;
 
     // 1. Get Encoder data (pulse period)
     noInterrupts();
@@ -215,12 +229,13 @@ void loop() {
 
     // 4. PID Speed calculation
     error = abs(target_rpm) - abs(avg_rpm);
-    speed += kP * error + kD * (error - last_error) / (period_ms / 1000.0);
-    speed = constrain(speed, 0, 65535*80/100); 
+    output += kP * error + kD * (error - last_error) / (period_ms / 1000.0);
+    output = constrain(output, 0, 65535); 
     last_error = error;
+    speed = map(output, 0, 65535, 0, MAX_PWM);
 
-    //4.5 Stall Detection Logic
-    if (abs(target_rpm) > 0 && speed > MAX_SPEED && abs(avg_rpm) < MIN_SAFE_RPM) {
+    //4.5. Stall Detection Logic
+    if (abs(target_rpm) > 0 && speed > STALL_SPEED && abs(avg_rpm) < MIN_SAFE_RPM) {
       if (stall_timer == 0) {
         //Start stall timer
         stall_timer = current_time;
@@ -236,6 +251,7 @@ void loop() {
     else {
       stall_timer = 0; // Reset timer again if not stall
     }
+
 
     // 5. Speed and Direction change
     if (target_rpm == 0) {
@@ -261,7 +277,7 @@ void loop() {
   }
 
   // 7. BLE message
-  if (current_time - prev_noti_time >= 800) {
+  if (current_time - prev_noti_time >= 200) {
     prev_noti_time = current_time;
     // 6. Update BLE Notify and Serial
     String output = String(target_rpm) + "," + 
@@ -301,7 +317,7 @@ void pin_setup(){
   pinMode(A, INPUT_PULLUP);
   pinMode(B, INPUT_PULLUP);
 
-  analogWriteResolution(EN_PIN, 16);
+  analogWriteResolution(EN_PIN, PWM_resolution);
   digitalWrite  (PH_PIN, 0);
   analogWrite   (EN_PIN, 0);
   digitalWrite  (SLEEP, 1);
@@ -319,7 +335,7 @@ void mpu_setup(){
     Fastwire::setup(400, true);
   #endif
 
-  while (!Serial) {}
+  //while (!Serial) {}
 
   /*Initialize device and check connection*/ 
   Serial.println("Initializing MPU...");
