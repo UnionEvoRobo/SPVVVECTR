@@ -276,7 +276,7 @@ def main():
         #MPU data display
         imu_message = tk.StringVar()
         imu_message.set("Accel: N/A\nGyro: N/A")
-        tk.Label(root, textvariable=imu_message, height=2).grid(
+        tk.Label(root, textvariable=imu_message, height=2, width=cell_width).grid(
             row = CURR_ROW+6,
             column = col_offset
         )
@@ -296,6 +296,14 @@ def main():
         }
         
     CURR_ROW += 8
+
+    #Test results and Bayesian optimization display
+    test_message = tk.StringVar()
+    test_message.set("Testing results here...")
+    Test = tk.Label(root, textvariable=test_message, height=2, width=cell_width)
+    Test.grid(row = CURR_ROW, column = 0)
+
+    
 
     #Update data:
     async def update_data():

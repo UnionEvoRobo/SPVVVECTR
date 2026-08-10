@@ -37,31 +37,26 @@ String name = "SPVVVECTR2";
 String name = "SPVVVECTR3";
 #define SERVICE_UUID        "e132a2ee-a68a-4b4b-98fa-29ef8bbc0be2"
 #define CHARACTERISTIC_UUID "ccba8d13-8743-45f7-9fd9-69a20a9acddc"
-
-String name = "test_board";
-#define SERVICE_UUID        "900ec402-1a33-4c94-a3d7-076951f68065"
-#define CHARACTERISTIC_UUID "cf9ecefe-a9f3-4087-af6a-cf7a6f917750"
 */
 
 
 /*      BLE variables: Change name and UUID here      */
-String name = "test_board";
-#define SERVICE_UUID        "900ec402-1a33-4c94-a3d7-076951f68065"
-#define CHARACTERISTIC_UUID "cf9ecefe-a9f3-4087-af6a-cf7a6f917750"
-
+String name = "SPVVVECTR3";
+#define SERVICE_UUID        "e132a2ee-a68a-4b4b-98fa-29ef8bbc0be2"
+#define CHARACTERISTIC_UUID "ccba8d13-8743-45f7-9fd9-69a20a9acddc"
 BLECharacteristic *pGlobalCharacteristic; 
 bool sprint = true;
 
 
 /*            Declare the GPIO pins here              */
-const int Batt_V    = D0;
-const int EN_PIN    = D10;                  
-const int PH_PIN    = D9;                  
-const int SLEEP     = D8;                 
-const int A         = D3;
-const int B         = D2; 
-const int MPU_SDA   = D4;
-const int MPU_SCL   = D5;
+const int EN_PIN    = 25;                  //Note: Old board uses 26
+const int PH_PIN    = 26;                  //Note: Old board uses 25
+const int SLEEP     = 27;                  //Note: Not on old board
+const int A         = 33;
+const int B         = 34; 
+const int MPU_SDA   = 21;
+const int MPU_SCL   = 22;
+const int INT       = 9;
 
 
 /*                Declare MPU6050 here                */
@@ -76,8 +71,9 @@ volatile bool is_calibrating = false;
 
 /*         Declare Encoder specifications here        */
 const float reduction_ratio = 10.0;         //Since the motor is 1:10 reduction
-const int   ppr_num = 12;                    //Inside encoder datasheet
+const int   ppr_num = 7;                    //Inside encoder datasheet
 const float hall_resolution = reduction_ratio * ppr_num; 
+
 
 /*                Declare Other stuff  here                */
 const int PWM_resolution = 12;
@@ -91,9 +87,9 @@ volatile int  direction = 1;                //1 is CCW
 
 //Stall Detection variables
 volatile unsigned long stall_timer = 0;
-const unsigned long STALL_THRESHOLD_MS = 1000;  //time before killing power
-const float MIN_SAFE_RPM = 20.0;                //minimum RPM to be considered "moving"
-const int MAX_SPEED = MAX_PWM * 20/100;           //pwm driver is 16-bit
+const unsigned long STALL_THRESHOLD_MS = 1000;    //time before killing power
+const float MIN_SAFE_RPM = 10.0;                  //minimum RPM to be considered "moving"
+const int STALL_SPEED = MAX_PWM * 15/100;           //max stall PWM allowed
 
 // Average calculation variables
 #define FILTER_SIZE 10
@@ -107,15 +103,17 @@ unsigned long prev_loop_time = 0;
 unsigned long prev_noti_time = 0;
 const float period_ms = 50; 
 float target_rpm = 0.0;                         //Set initial RPM here
+float last_target_rpm = 0.0;
 float speed = 0;                                //Set initial speed here
 const int MAX_RPM = 1000;                       //Set Maximum RPM here
+unsigned long start_time;
 
 // PID  Controller Variables (Adjusted for 16-bit PWM)
-double Kp = 3;
-double Ki = 10.5;
-double error = 0;
-double integralSum = 0;
-double max_integral = MAX_PWM/Ki;
+float output = 0;
+const float kP = 5.0;
+const float kD = 0;
+float error = 0;
+float last_error = 0;
 
 
 /*========================================================*/
@@ -179,14 +177,14 @@ class MyServerCallbacks: public BLEServerCallbacks {
 /*========================================================*/
 /*                  Main setup function                   */
 void setup() {
-
-  Serial.begin(115200);
+  Serial.begin (115200);
   setCpuFrequencyMhz(80);
   pin_setup();
   ble_setup();
-  //mpu_setup();
-  //mpu_read();
-  //mpu_calibration();
+  mpu_setup();
+  mpu_read();
+  mpu_calibration();
+  start_time = millis();
 }
 
 
@@ -200,6 +198,13 @@ void loop() {
   //MOTOR CONTROL LOGIC
   if (current_time - prev_loop_time >= period_ms) {
     prev_loop_time = current_time;
+
+    // 0.5. Flip detection logic
+    if (last_target_rpm * target_rpm < 0) {
+      analogWrite(EN_PIN, 0);
+      vTaskDelay(pdMS_TO_TICKS(150));
+    }
+    last_target_rpm = target_rpm;
 
     // 1. Get Encoder data (pulse period)
     noInterrupts();
@@ -225,20 +230,14 @@ void loop() {
     avg_rpm = sum / FILTER_SIZE;
 
     // 4. PID Speed calculation
-    error = target_rpm - avg_rpm;
-    integralSum += error * period_ms/1000;
-    if (integralSum > max_integral) {integralSum = max_integral;}
-    else if (integralSum < -max_integral) {integralSum = -max_integral;}
+    error = abs(target_rpm) - abs(avg_rpm);
+    output += kP * error + kD * (error - last_error) / (period_ms / 1000.0);
+    output = constrain(output, 0, 65535); 
+    last_error = error;
+    speed = map(output, 0, 65535, 0, MAX_PWM);
 
-    double pTerm = Kp * error;
-    double iTerm = Ki * integralSum;
-    double output = pTerm + iTerm;
-    
-    if (output > MAX_PWM) {output = MAX_PWM;}
-    else if (output < -MAX_PWM) {output = -MAX_PWM;}
-
-    //4.5 Stall Detection Logic
-    if (abs(target_rpm) > 0 && abs(output) > MAX_SPEED && abs(avg_rpm) < MIN_SAFE_RPM) {
+    //4.5. Stall Detection Logic
+    if (abs(target_rpm) > 0 && speed > STALL_SPEED && abs(avg_rpm) < MIN_SAFE_RPM) {
       if (stall_timer == 0) {
         //Start stall timer
         stall_timer = current_time;
@@ -255,34 +254,43 @@ void loop() {
       stall_timer = 0; // Reset timer again if not stall
     }
 
+
     // 5. Speed and Direction change
     if (target_rpm == 0) {
       analogWrite(EN_PIN, 0);
+      speed = 0;
+    } 
+    else if (target_rpm > 0) {
+      digitalWrite(PH_PIN, HIGH);
+      analogWrite(EN_PIN, (int)speed);
     } 
     else {
-      if (output > 0) {digitalWrite(PH_PIN, HIGH);}
-      else {digitalWrite(PH_PIN, LOW);}
-      analogWrite(EN_PIN, abs(output));
+      digitalWrite(PH_PIN, LOW);
+      analogWrite(EN_PIN, (int)speed);
     }
 
     // 6. MPU-6050 data
-    /*if (!is_calibrating) {
+    if (!is_calibrating) {
       mpu_read();
-    }*/
+    }
+
+    Serial.print(current_time - start_time);
+    Serial.print(",");
+    Serial.println(avg_rpm);
   }
 
   // 7. BLE message
-  if (current_time - prev_noti_time >= 800) {
+  if (current_time - prev_noti_time >= 200) {
     prev_noti_time = current_time;
     // 6. Update BLE Notify and Serial
     String output = String(target_rpm) + "," + 
-                    String(avg_rpm) /*+ "," + 
+                    String(avg_rpm) + "," + 
                     String(ax) + "," + 
                     String(ay) + "," + 
                     String(az) + "," + 
                     String(gx) + "," + 
                     String(gy) + "," + 
-                    String(gz)*/;
+                    String(gz);
     pGlobalCharacteristic->setValue(output.c_str());
     pGlobalCharacteristic->notify();
   }
@@ -308,7 +316,7 @@ void pin_setup(){
   pinMode(PH_PIN, OUTPUT);
   pinMode(SLEEP, OUTPUT);
 
-  //pinMode(INT, INPUT_PULLUP);
+  pinMode(INT, INPUT_PULLUP);
   pinMode(A, INPUT_PULLUP);
   pinMode(B, INPUT_PULLUP);
 
@@ -330,7 +338,7 @@ void mpu_setup(){
     Fastwire::setup(400, true);
   #endif
 
-  while (!Serial) {}
+  //while (!Serial) {}
 
   /*Initialize device and check connection*/ 
   Serial.println("Initializing MPU...");
@@ -347,9 +355,8 @@ void mpu_setup(){
 
 
 void ble_setup() {
-  //BLE initialization, MTU packet size, create a server and a service
+  //BLE initialization, create a server and a service
   BLEDevice::init(name);
-  BLEDevice::setMTU(512);
   BLEServer *pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
   BLEService *pService = pServer->createService(SERVICE_UUID);
@@ -375,7 +382,7 @@ void ble_setup() {
   BLEAdvertising *pAdvertising = pServer->getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
   
-  pAdvertising->setScanResponse(true); 
+  pAdvertising->setScanResponse(false); 
   pAdvertising->setMinPreferred(0x00);  // Clear preferred settings
   pAdvertising->setMinPreferred(0x06);  // Then set them again
   

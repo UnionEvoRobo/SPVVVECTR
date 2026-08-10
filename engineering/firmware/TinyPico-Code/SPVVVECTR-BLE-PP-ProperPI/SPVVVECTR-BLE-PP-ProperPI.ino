@@ -37,31 +37,26 @@ String name = "SPVVVECTR2";
 String name = "SPVVVECTR3";
 #define SERVICE_UUID        "e132a2ee-a68a-4b4b-98fa-29ef8bbc0be2"
 #define CHARACTERISTIC_UUID "ccba8d13-8743-45f7-9fd9-69a20a9acddc"
-
-String name = "test_board";
-#define SERVICE_UUID        "900ec402-1a33-4c94-a3d7-076951f68065"
-#define CHARACTERISTIC_UUID "cf9ecefe-a9f3-4087-af6a-cf7a6f917750"
 */
 
 
 /*      BLE variables: Change name and UUID here      */
-String name = "test_board";
-#define SERVICE_UUID        "900ec402-1a33-4c94-a3d7-076951f68065"
-#define CHARACTERISTIC_UUID "cf9ecefe-a9f3-4087-af6a-cf7a6f917750"
-
+String name = "SPVVVECTR2";
+#define SERVICE_UUID        "8aaba9c2-7f68-49d6-97cb-b9783ea29fd6"
+#define CHARACTERISTIC_UUID "2a612f78-13b2-4b3a-bab8-50b00d2f003f"
 BLECharacteristic *pGlobalCharacteristic; 
 bool sprint = true;
 
 
 /*            Declare the GPIO pins here              */
-const int Batt_V    = D0;
-const int EN_PIN    = D10;                  
-const int PH_PIN    = D9;                  
-const int SLEEP     = D8;                 
-const int A         = D3;
-const int B         = D2; 
-const int MPU_SDA   = D4;
-const int MPU_SCL   = D5;
+const int EN_PIN    = 25;                  //Note: Old board uses 26
+const int PH_PIN    = 26;                  //Note: Old board uses 25
+const int SLEEP     = 27;                  //Note: Not on old board
+const int A         = 33;
+const int B         = 34; 
+const int MPU_SDA   = 21;
+const int MPU_SCL   = 22;
+const int INT       = 9;
 
 
 /*                Declare MPU6050 here                */
@@ -76,8 +71,9 @@ volatile bool is_calibrating = false;
 
 /*         Declare Encoder specifications here        */
 const float reduction_ratio = 10.0;         //Since the motor is 1:10 reduction
-const int   ppr_num = 12;                    //Inside encoder datasheet
+const int   ppr_num = 7;                    //Inside encoder datasheet
 const float hall_resolution = reduction_ratio * ppr_num; 
+
 
 /*                Declare Other stuff  here                */
 const int PWM_resolution = 12;
@@ -91,9 +87,9 @@ volatile int  direction = 1;                //1 is CCW
 
 //Stall Detection variables
 volatile unsigned long stall_timer = 0;
-const unsigned long STALL_THRESHOLD_MS = 1000;  //time before killing power
-const float MIN_SAFE_RPM = 20.0;                //minimum RPM to be considered "moving"
-const int MAX_SPEED = MAX_PWM * 20/100;           //pwm driver is 16-bit
+const unsigned long STALL_THRESHOLD_MS = 1000;    //time before killing power
+const float MIN_SAFE_RPM = 10.0;                  //minimum RPM to be considered "moving"
+const int STALL_SPEED = MAX_PWM * 15/100;           //max stall PWM allowed
 
 // Average calculation variables
 #define FILTER_SIZE 10
@@ -107,7 +103,6 @@ unsigned long prev_loop_time = 0;
 unsigned long prev_noti_time = 0;
 const float period_ms = 50; 
 float target_rpm = 0.0;                         //Set initial RPM here
-float speed = 0;                                //Set initial speed here
 const int MAX_RPM = 1000;                       //Set Maximum RPM here
 
 // PID  Controller Variables (Adjusted for 16-bit PWM)
@@ -179,21 +174,19 @@ class MyServerCallbacks: public BLEServerCallbacks {
 /*========================================================*/
 /*                  Main setup function                   */
 void setup() {
-
-  Serial.begin(115200);
+  Serial.begin (115200);
   setCpuFrequencyMhz(80);
   pin_setup();
   ble_setup();
-  //mpu_setup();
-  //mpu_read();
-  //mpu_calibration();
+  mpu_setup();
+  mpu_read();
+  mpu_calibration();
 }
 
 
 /*========================================================*/
 /*                  Main loop function                   */
 void loop() {
-  
   //Update timer
   unsigned long current_time = millis();
   
@@ -237,8 +230,8 @@ void loop() {
     if (output > MAX_PWM) {output = MAX_PWM;}
     else if (output < -MAX_PWM) {output = -MAX_PWM;}
 
-    //4.5 Stall Detection Logic
-    if (abs(target_rpm) > 0 && abs(output) > MAX_SPEED && abs(avg_rpm) < MIN_SAFE_RPM) {
+    //4.5. Stall Detection Logic
+    if (abs(target_rpm) > 0 && abs(output) > STALL_SPEED && abs(avg_rpm) < MIN_SAFE_RPM) {
       if (stall_timer == 0) {
         //Start stall timer
         stall_timer = current_time;
@@ -246,7 +239,7 @@ void loop() {
       else if (current_time - stall_timer > STALL_THRESHOLD_MS) {
         // STALL TRIGGERED
         target_rpm = 0; 
-        speed = 0;
+        output = 0;
         stall_timer = 0; // Reset timer
         Serial.println(">>> Stall Detected! Turning off motor.");
       }
@@ -254,6 +247,7 @@ void loop() {
     else {
       stall_timer = 0; // Reset timer again if not stall
     }
+
 
     // 5. Speed and Direction change
     if (target_rpm == 0) {
@@ -266,23 +260,23 @@ void loop() {
     }
 
     // 6. MPU-6050 data
-    /*if (!is_calibrating) {
+    if (!is_calibrating) {
       mpu_read();
-    }*/
+    }
   }
 
   // 7. BLE message
-  if (current_time - prev_noti_time >= 800) {
+  if (current_time - prev_noti_time >= 200) {
     prev_noti_time = current_time;
     // 6. Update BLE Notify and Serial
     String output = String(target_rpm) + "," + 
-                    String(avg_rpm) /*+ "," + 
+                    String(avg_rpm) + "," + 
                     String(ax) + "," + 
                     String(ay) + "," + 
                     String(az) + "," + 
                     String(gx) + "," + 
                     String(gy) + "," + 
-                    String(gz)*/;
+                    String(gz);
     pGlobalCharacteristic->setValue(output.c_str());
     pGlobalCharacteristic->notify();
   }
@@ -308,7 +302,7 @@ void pin_setup(){
   pinMode(PH_PIN, OUTPUT);
   pinMode(SLEEP, OUTPUT);
 
-  //pinMode(INT, INPUT_PULLUP);
+  pinMode(INT, INPUT_PULLUP);
   pinMode(A, INPUT_PULLUP);
   pinMode(B, INPUT_PULLUP);
 
@@ -330,7 +324,7 @@ void mpu_setup(){
     Fastwire::setup(400, true);
   #endif
 
-  while (!Serial) {}
+  //while (!Serial) {}
 
   /*Initialize device and check connection*/ 
   Serial.println("Initializing MPU...");
@@ -347,9 +341,8 @@ void mpu_setup(){
 
 
 void ble_setup() {
-  //BLE initialization, MTU packet size, create a server and a service
+  //BLE initialization, create a server and a service
   BLEDevice::init(name);
-  BLEDevice::setMTU(512);
   BLEServer *pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
   BLEService *pService = pServer->createService(SERVICE_UUID);
@@ -375,7 +368,7 @@ void ble_setup() {
   BLEAdvertising *pAdvertising = pServer->getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
   
-  pAdvertising->setScanResponse(true); 
+  pAdvertising->setScanResponse(false); 
   pAdvertising->setMinPreferred(0x00);  // Clear preferred settings
   pAdvertising->setMinPreferred(0x06);  // Then set them again
   
