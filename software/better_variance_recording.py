@@ -4,23 +4,15 @@ from spvvvectr_tracker import QtmTracker
 from SPVVVECTR_Class import SPVVVECTR
 import bo_skopt
 
-STRUTS = ["SPVVVECTR1", "SPVVVECTR2", "SPVVVECTR3"]
 
-
-async def keep_struts_connected(robot, poll_seconds=1):
-    """
-    Background watchdog: if a strut drops off BLE mid-run, reconnect it.
-    Cancel this task when the run finishes.
-    """
+async def keep_struts_connected(robot):
+    # reconnect any strut that drops off BLE mid-run
     while True:
-        for strut in STRUTS:
-            try:
-                if await robot.get_status(strut) != "ONLINE":
-                    print(f"{strut} is not online! Attempting to reconnect...")
-                    await robot.connect_strut(strut)
-            except Exception as e:
-                print(f"Reconnect attempt for {strut} failed: {e}")
-        await asyncio.sleep(poll_seconds)
+        for strut in ["SPVVVECTR1", "SPVVVECTR2", "SPVVVECTR3"]:
+            if await robot.get_status(strut) != "ONLINE":
+                print(f"{strut} is not online! Attempting to reconnect...")
+                await robot.connect_strut(strut)
+        await asyncio.sleep(1)
 
 
 async def variance_recording(rpm, num_trials):
@@ -32,39 +24,25 @@ async def variance_recording(rpm, num_trials):
     tracker = QtmTracker("10.76.30.85")
     await asyncio.sleep(2)
 
-    for strut in STRUTS:
-        print(f"{strut} status:", await robot.get_status(strut))
-
     # initialize csv file
     csv_filename = f"variance_results_{rpm}.csv"
     with open(csv_filename, 'a', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(["Trial_Number", "M1", "M2", "M3",
-                         "Displacement_mm", "Yaw_rotation_deg"])
+        writer.writerow(["Trial_Number", "Displacement_mm", "Yaw_rotation_deg"])
 
     watchdog = asyncio.create_task(keep_struts_connected(robot))
 
-    try:
-        for i in range(num_trials):
-            displacement, x_diff, y_diff, z_diff, yaw_rotation = \
-                await bo_skopt.run_physical_trials(rpm, i + 1, num_trials, robot, tracker)
+    for i in range(num_trials):
+        displacement, x_diff, y_diff, z_diff, yaw_rotation = await bo_skopt.run_physical_trials(rpm, i + 1, num_trials, robot, tracker)
 
-            # append to csv
-            with open(csv_filename, 'a', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow([i + 1, rpm[0], rpm[1], rpm[2],
-                                 f'{displacement:.2f}', f'{yaw_rotation:.2f}'])
+        # append to csv
+        with open(csv_filename, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([i + 1, f'{displacement:.2f}', f'{yaw_rotation:.2f}'])
 
-            print(f"Appended to {csv_filename}")
-    finally:
-        watchdog.cancel()
-        try:
-            await watchdog
-        except asyncio.CancelledError:
-            pass
-        await robot.stop_all()
+        print(f"Appended to {csv_filename}")
 
-    print(f"\n{num_trials} trials complete. Results in {csv_filename}")
+    watchdog.cancel()
 
 
 async def main():
