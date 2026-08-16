@@ -28,3 +28,6 @@ python SPVVVECTR_GUI_Control.py # manual control + recording
 python bo_skopt.py              # gait optimization (needs Qualisys)
 ```
 
+*Also see `Summer_2026_Research_Report.pdf` for a detailed overview of our project and results* 
+
+
